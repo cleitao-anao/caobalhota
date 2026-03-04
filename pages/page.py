@@ -3,8 +3,9 @@ from views.view import LoginView
 from model.database import get_connection
 
 class LoginPage:
-    def __init__(self, master):
+    def __init__(self, master, on_login_success=None):
         self.master = master
+        self.on_login_success = on_login_success
         self.view = LoginView(master=self.master, on_login_click=self.tentar_login)
         self.view.place(relx=0.5, rely=0.5, anchor="center")
         
@@ -27,8 +28,8 @@ class LoginPage:
             if funcionario:
                 nome_func = funcionario[1]
                 messagebox.showinfo("Sucesso", f"Login realizado com sucesso!\nBem-vindo(a), {nome_func}.")
-                # Ação para fechar tela de login e abrir a principal:
-                # self.view.destroy()
+                if self.on_login_success:
+                    self.on_login_success()
             else:
                 messagebox.showerror("Acesso Negado", "E-mail ou senha incorretos.")
 
