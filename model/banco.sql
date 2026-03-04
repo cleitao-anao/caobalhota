@@ -8,7 +8,6 @@ CREATE TABLE CLIENTagendamentoE (
     telefone VARCHAR(20),
     email VARCHAR(100),
     endereco VARCHAR(255),
-	admin char(1)
 );
 
 -- 2. Tabela FUNCIONARIO
@@ -19,7 +18,7 @@ CREATE TABLE FUNCIONARIO (
     telefone VARCHAR(20),
     email VARCHAR(100),
     login VARCHAR(50) UNIQUE,
-    senha VARCHAR(255) -- Lembre-se de usar HASH na aplicação
+    senha VARCHAR(255) 
 );
 
 -- 3. Tabela SERVICO
