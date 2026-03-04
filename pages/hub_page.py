@@ -1,5 +1,6 @@
 from views.hub_view import HubView, SENHA_ADMIN
 from tkinter import messagebox
+from model.produto import ProdutoModel
 
 class HubPage:
     def __init__(self, master):
@@ -9,7 +10,8 @@ class HubPage:
         self.is_admin = False
         self.vendas_produtos = {p: 0 for p in ["Ração", "Shampoo", "Coleira", "Petisco", "Brinquedo", "Cama", "Roupas", "Osso", "Caixa", "Escova"]}
         self.vendas_servicos = {s: 0 for s in ["Tosa", "Banho", "Hidratação", "Unhas", "Ouvido", "Taxi Pet", "Hospedagem", "Adestramento", "Consulta", "Vacina"]}
-        self.estoque_produtos = {p: 50 for p in self.vendas_produtos.keys()}
+        # Real product list from DB
+        self.produtos = []
         self.clientes_cadastrados = []
         self.agendamentos = [] 
         self.funcionarios = ["Carlos  (Dono)", "Ana Costa", "Lucas "]
@@ -47,9 +49,12 @@ class HubPage:
         self.view.desenhar_controle()
 
     def tela_registros(self):
+        # Update logic to pass current inventory list if necessary
+        self.carregar_produtos()
         self.view.desenhar_tela_registros()
 
     def tela_estoque_visualizacao(self):
+        self.carregar_produtos()
         self.view.desenhar_tela_estoque_visualizacao()
 
     def tela_funcionarios(self):
@@ -64,9 +69,59 @@ class HubPage:
     def abrir_modal_cadastro(self, item_para_venda=None, tipo_venda=None):
         self.view.abrir_modal_cadastro(item_para_venda, tipo_venda)
 
-    def alterar_estoque(self, p, v):
-        self.estoque_produtos[p] += v
-        self.tela_estoque_visualizacao()
+    # CRUD DE PRODUTO ------------------------------------------
+    def carregar_produtos(self):
+        self.produtos = ProdutoModel.listar_todos()
+
+    def alterar_estoque(self, id_produto, qtd_alteracao):
+        produto = ProdutoModel.buscar_por_id(id_produto)
+        if produto:
+            novo_estoque = produto[5] + qtd_alteracao
+            if novo_estoque < 0: novo_estoque = 0 # Previne estoque negativo
+            sucesso = ProdutoModel.atualizar(produto[0], produto[1], produto[2], produto[3], produto[4], novo_estoque)
+            if sucesso:
+                self.tela_estoque_visualizacao()
+            else:
+                messagebox.showerror("Erro", "Erro ao atualizar estoque no banco de dados.")
+
+    def salvar_produto(self, id_produto_atual, codigo, nome, descricao, preco, estoque):
+        try:
+            preco_float = float(preco.replace(",", "."))
+            estoque_int = int(estoque)
+        except ValueError:
+            messagebox.showwarning("Aviso", "Preço e Estoque devem ser numéricos.")
+            return False
+
+        if not nome or preco_float < 0 or estoque_int < 0:
+            messagebox.showwarning("Aviso", "Nome não pode ser vazio. Valores não podem ser negativos.")
+            return False
+
+        if id_produto_atual is None:
+            # INSERIR
+            sucesso = ProdutoModel.inserir(codigo, nome, descricao, preco_float, estoque_int)
+            msg = "cadastrado"
+        else:
+            # ATUALIZAR
+            sucesso = ProdutoModel.atualizar(id_produto_atual, codigo, nome, descricao, preco_float, estoque_int)
+            msg = "atualizado"
+
+        if sucesso:
+            messagebox.showinfo("Sucesso", f"Produto {msg} com sucesso!")
+            self.tela_estoque_visualizacao()
+            return True
+        else:
+            messagebox.showerror("Erro", f"Erro ao salvar produto no banco de dados.")
+            return False
+
+    def excluir_produto(self, id_produto):
+        if messagebox.askyesno("Confirmar", "Tem certeza que deseja excluir este produto?"):
+            if ProdutoModel.deletar(id_produto):
+                messagebox.showinfo("Sucesso", "Produto excluído com sucesso.")
+                self.tela_estoque_visualizacao()
+            else:
+                messagebox.showerror("Erro", "Erro ao excluir o produto.")
+    
+    # OUTROS ----------------------------------------------------
 
     def demitir_funcionario(self, func):
         if func in self.funcionarios:
@@ -75,8 +130,9 @@ class HubPage:
 
     def finalizar_venda_logica(self, item, tipo, cliente=None, data_hora=None):
         if tipo == "produto":
-            self.vendas_produtos[item] += 1
-            self.estoque_produtos[item] -= 1
+            pass # A logica antiga do PDV dependia da lista fake. Requeriria DB em VENDA e ITEM_VENDA futuramente.
+            # self.vendas_produtos[item] += 1
+            # self.estoque_produtos[item] -= 1
         else:
             self.vendas_servicos[item] += 1
             if cliente:

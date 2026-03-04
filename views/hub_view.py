@@ -153,16 +153,20 @@ class HubView(ctk.CTkFrame):
         ctk.CTkLabel(scroll, text="📦 Melhores Ofertas", font=("Inter", 22, "bold"), text_color=COR_TEXTO_TITULO).pack(pady=(0, 15), anchor="w")
         gp = ctk.CTkFrame(scroll, fg_color="transparent")
         gp.pack(fill="x")
-        for i, p in enumerate(self.controller.vendas_produtos.keys()):
-            qtd = self.controller.estoque_produtos[p]
+        for i, p_row in enumerate(self.controller.produtos):
+            # p_row format: (id, codigo, nome, descricao, preco, estoque)
+            p_id = p_row[0]
+            p_nome = p_row[2]
+            p_estoque = p_row[5]
+            
             card = ctk.CTkFrame(gp, fg_color=COR_CARD, corner_radius=12, border_width=1, border_color=COR_BORDA, width=180, height=120)
             card.grid(row=i//5, column=i%5, padx=8, pady=8)
             card.grid_propagate(False)
             
-            ctk.CTkLabel(card, text=p, font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(pady=(15, 0))
-            ctk.CTkLabel(card, text=f"Estoque: {qtd}", font=("Inter", 11), text_color="gray").pack()
+            ctk.CTkLabel(card, text=p_nome, font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(pady=(15, 0))
+            ctk.CTkLabel(card, text=f"Estoque: {p_estoque}", font=("Inter", 11), text_color="gray").pack()
             ctk.CTkButton(card, text="Comprar", height=28, width=100, fg_color=COR_NAVBAR, 
-                          command=lambda x=p: self.fluxo_venda(x, "produto")).pack(pady=10)
+                          command=lambda x=p_nome: self.fluxo_venda(x, "produto")).pack(pady=10)
 
         ctk.CTkLabel(scroll, text="✂️ Centro de Estética & Saúde (Obrigatório Cadastro)", font=("Inter", 22, "bold"), text_color=COR_TEXTO_TITULO).pack(pady=(30, 15), anchor="w")
         gs = ctk.CTkFrame(scroll, fg_color="transparent")
@@ -244,19 +248,112 @@ class HubView(ctk.CTkFrame):
 
     def desenhar_tela_estoque_visualizacao(self):
         self.limpar_tela()
-        ctk.CTkLabel(self.content_area, text="📦 Inventário de Produtos", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(pady=20)
+        
+        topo_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        topo_frame.pack(fill="x", pady=20, padx=50)
+
+        ctk.CTkLabel(topo_frame, text="📦 Inventário de Produtos", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left")
+        
+        if self.controller.is_admin:
+            ctk.CTkButton(topo_frame, text="+ Novo Produto", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 14, "bold"), 
+                          command=lambda: self.abrir_modal_produto()).pack(side="right")
+
         scroll = ctk.CTkScrollableFrame(self.content_area, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA, height=450)
         scroll.pack(fill="x", padx=50)
-        for produto, qtd in self.controller.estoque_produtos.items():
-            f = ctk.CTkFrame(scroll, fg_color="transparent")
-            f.pack(fill="x", pady=5, padx=20)
-            ctk.CTkLabel(f, text=produto, width=200, anchor="w", font=("Inter", 13), text_color=COR_INPUT_TEXTO).pack(side="left")
-            cor_q = COR_SUCESSO if qtd > 10 else COR_PERIGO
-            ctk.CTkLabel(f, text=f"{qtd} un.", text_color=cor_q, font=("Inter", 13, "bold"), width=100).pack(side="left")
+        
+        # Cabeçalho da tabela
+        h_frame = ctk.CTkFrame(scroll, fg_color=COR_NAVBAR, corner_radius=8, height=40)
+        h_frame.pack(fill="x", pady=(0, 10), padx=5)
+        h_frame.pack_propagate(False)
+        ctk.CTkLabel(h_frame, text="Cód", width=50, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        ctk.CTkLabel(h_frame, text="Nome", width=180, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        ctk.CTkLabel(h_frame, text="Preço", width=80, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        ctk.CTkLabel(h_frame, text="Estoque", width=80, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        if self.controller.is_admin:
+            ctk.CTkLabel(h_frame, text="Ações", width=120, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="center").pack(side="right", padx=10)
+
+        for p_row in self.controller.produtos:
+            # p_row: (0:id, 1:codigo, 2:nome, 3:descricao, 4:preco, 5:estoque)
+            p_id = p_row[0]
+            p_codigo = str(p_row[1] or "")
+            p_nome = str(p_row[2])
+            p_preco = f"R$ {p_row[4]:.2f}"
+            p_estoque = p_row[5]
+
+            f = ctk.CTkFrame(scroll, fg_color="transparent", border_width=0, height=40)
+            f.pack(fill="x", pady=2, padx=5)
+            f.pack_propagate(False)
+            
+            ctk.CTkLabel(f, text=str(p_codigo), width=50, anchor="w", font=("Inter", 13), text_color=COR_INPUT_TEXTO).pack(side="left", padx=10)
+            ctk.CTkLabel(f, text=str(p_nome), width=180, anchor="w", font=("Inter", 13), text_color=COR_INPUT_TEXTO).pack(side="left", padx=10)
+            ctk.CTkLabel(f, text=str(p_preco), width=80, anchor="w", font=("Inter", 13), text_color=COR_INPUT_TEXTO).pack(side="left", padx=10)
+            
+            cor_q = COR_SUCESSO if p_estoque > 10 else COR_PERIGO
+            ctk.CTkLabel(f, text=f"{p_estoque} un.", text_color=cor_q, font=("Inter", 13, "bold"), width=80, anchor="w").pack(side="left", padx=10)
+            
             if self.controller.is_admin:
-                ctk.CTkButton(f, text="+", width=35, fg_color=COR_NAVBAR, command=lambda p=produto: self.controller.alterar_estoque(p, 1)).pack(side="right", padx=2)
-                ctk.CTkButton(f, text="-", width=35, fg_color=COR_BOTAO_VOLTAR, command=lambda p=produto: self.controller.alterar_estoque(p, -1)).pack(side="right", padx=2)
+                acoes_frame = ctk.CTkFrame(f, fg_color="transparent", width=120)
+                acoes_frame.pack(side="right", padx=10)
+                
+                # Delete
+                ctk.CTkButton(acoes_frame, text="Deletar", width=30, height=30, fg_color=COR_PERIGO, 
+                              command=lambda id_p=p_id: self.controller.excluir_produto(id_p)).pack(side="right", padx=2)
+                # Editar
+                ctk.CTkButton(acoes_frame, text="Editar", width=30, height=30, fg_color=COR_NAVBAR, 
+                              command=lambda p=p_row: self.abrir_modal_produto(p)).pack(side="right", padx=2)
+                # Adicionar estoque rápido
+                ctk.CTkButton(acoes_frame, text="+", width=30, height=30, fg_color=COR_SUCESSO, 
+                              command=lambda id_p=p_id: self.controller.alterar_estoque(id_p, 1)).pack(side="right", padx=2)
+                # Remover estoque rápido
+                ctk.CTkButton(acoes_frame, text="-", width=30, height=30, fg_color=COR_BOTAO_VOLTAR, 
+                              command=lambda id_p=p_id: self.controller.alterar_estoque(id_p, -1)).pack(side="right", padx=2)
+
         ctk.CTkButton(self.content_area, text="Voltar", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, corner_radius=20).pack(pady=25)
+
+    def abrir_modal_produto(self, produto_dados=None):
+        # produto_dados = (id, codigo, nome, descricao, preco, estoque)
+        modal = ctk.CTkToplevel(self)
+        modal.geometry("500x650")
+        titulo = "Novo Produto" if not produto_dados else f"Editar: {produto_dados[2]}"
+        modal.title(titulo)
+        modal.configure(fg_color=COR_FUNDO_EXTERNO)
+        modal.attributes("-topmost", True)
+        modal.grab_set()
+
+        ctk.CTkLabel(modal, text=titulo, font=("Inter", 20, "bold"), text_color=COR_NAVBAR).pack(pady=20)
+        
+        container = ctk.CTkFrame(modal, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        container.pack(fill="both", expand=True, padx=30, pady=(0, 30))
+
+        ent_codigo = self.criar_input(container, "Código (ex: PRD-001)")
+        ent_nome = self.criar_input(container, "Nome do Produto *")
+        ent_descricao = self.criar_input(container, "Descrição")
+        ent_preco = self.criar_input(container, "Preço Unitário (R$) *")
+        ent_estoque = self.criar_input(container, "Estoque Atual *")
+
+        id_atual = None
+        if produto_dados:
+            id_atual = produto_dados[0]
+            ent_codigo.insert(0, str(produto_dados[1] or ""))
+            ent_nome.insert(0, str(produto_dados[2]))
+            ent_descricao.insert(0, str(produto_dados[3] or ""))
+            ent_preco.insert(0, str(produto_dados[4]))
+            ent_estoque.insert(0, str(produto_dados[5]))
+        else:
+            ent_estoque.insert(0, "0")
+
+        def salvar():
+            cod = ent_codigo.get()
+            nom = ent_nome.get()
+            des = ent_descricao.get()
+            pre = ent_preco.get()
+            est = ent_estoque.get()
+            
+            sucesso = self.controller.salvar_produto(id_atual, cod, nom, des, pre, est)
+            if sucesso:
+                modal.destroy()
+
+        ctk.CTkButton(modal, text="Salvar Produto", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), height=45, command=salvar).pack(pady=(0, 20))
 
     def desenhar_tela_funcionarios(self):
         self.limpar_tela()
