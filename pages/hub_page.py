@@ -9,7 +9,7 @@ class HubPage:
         # State from original Hub
         self.is_admin = False
         self.vendas_produtos = {p: 0 for p in ["Ração", "Shampoo", "Coleira", "Petisco", "Brinquedo", "Cama", "Roupas", "Osso", "Caixa", "Escova"]}
-        self.vendas_servicos = {s: 0 for s in ["Tosa", "Banho", "Hidratação", "Unhas", "Ouvido", "Taxi Pet", "Hospedagem", "Adestramento", "Consulta", "Vacina"]}
+        self.vendas_servicos = {s: 0 for s in ["Tosa", "Banho", "Hidratação", "Unhas", "Ouvidos", "Taxi Pet", "Hospedagem", "Adestramento", "Consulta", "Vacina"]}
         # Real product list from DB
         self.produtos = []
         self.clientes_cadastrados = []
