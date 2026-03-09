@@ -7,7 +7,7 @@ CREATE TABLE CLIENTagendamentoE (
     nome VARCHAR(100) NOT NULL,
     telefone VARCHAR(20),
     email VARCHAR(100),
-    endereco VARCHAR(255),
+    endereco VARCHAR(255)
 );
 
 -- 2. Tabela FUNCIONARIO
