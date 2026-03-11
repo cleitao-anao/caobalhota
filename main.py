@@ -9,7 +9,7 @@ class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema Cãobalhota - Pro System")
-        self.geometry("1100x750") 
+        self.geometry("1200x800") 
         self.resizable(False, False)
         self.configure(fg_color=COR_FUNDO_EXTERNO)
 

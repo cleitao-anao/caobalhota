@@ -69,7 +69,7 @@ CREATE TABLE AGENDAMENTO (
     id_funcionario INT,
     data DATE,
     hora TIME,
-    status ENUM('agendado', 'iniciado', 'concluído', 'cancelado'),
+    status ENUM('agendado', 'iniciado', 'concluído', 'cancelado', 'pago'),
     cor_tintura VARCHAR(30),
     observacoes TEXT,
     CONSTRAINT fk_age_cliente FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id),

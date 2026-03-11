@@ -3,6 +3,8 @@ from tkinter import messagebox
 from model.produto import ProdutoModel
 from model.cliente import ClienteModel
 from model.pet import PetModel
+from model.agendamento import AgendamentoModel
+from model.venda import VendaModel
 class HubPage:
     def __init__(self, master):
         self.master = master
@@ -16,6 +18,10 @@ class HubPage:
         self.clientes = []  # Array of tuples: (id, nome, cpf, telefone, email, endereco, admin)
         self.agendamentos = [] 
         self.funcionarios = ["Carlos  (Dono)", "Ana Costa", "Lucas "]
+
+        # PDV Vendas state
+        self.carrinho_cliente = None
+        self.carrinho_itens = [] # format: {'tipo': 'produto'|'servico', 'id': int, 'nome': str, 'qtd': int, 'preco': float, 'id_agendamento': int(optional)}
 
         self.view = HubView(master, self)
         
@@ -62,7 +68,14 @@ class HubPage:
         self.view.desenhar_tela_funcionarios()
 
     def tela_vendas(self):
+        # A antiga "tela_vendas" da view.py virou "desenhar_tela_relatorios". Vendas será o PDV.
         self.view.desenhar_tela_vendas()
+        
+    def tela_registro_venda(self):
+        # The new POS system logic 
+        self.carregar_produtos()
+        self.carregar_clientes()
+        self.view.desenhar_tela_registro_venda()
 
     def tela_agenda(self):
         self.view.desenhar_tela_agenda()
@@ -176,3 +189,34 @@ class HubPage:
                 info_servico = f"{item} ({data_hora})" if data_hora else item
                 self.agendamentos.append({"humano": cliente.get('humano', ''), "pet": pets_str, "servico": info_servico})
         messagebox.showinfo("Sucesso", f"{item} concluído!")
+
+    # LOGICA PDV / NOVA VENDA
+    def buscar_servicos_nao_pagos(self, id_cliente):
+        return AgendamentoModel.listar_concluidos_nao_pagos(id_cliente)
+
+    def fechar_venda(self):
+        if not self.carrinho_cliente:
+            messagebox.showwarning("Aviso", "Selecione um cliente para a venda.")
+            return
+
+        if not self.carrinho_itens:
+            messagebox.showwarning("Aviso", "Adicione itens ao carrinho.")
+            return
+
+        total = sum(item['preco'] * item['qtd'] for item in self.carrinho_itens)
+        
+        sucesso = VendaModel.finalizar_venda(self.carrinho_cliente['id'], self.carrinho_itens, total)
+        if sucesso:
+            # Stats fallbacks for old Dashboard 
+            for it in self.carrinho_itens:
+                if it['tipo'] == 'produto' and it['nome'] in self.vendas_produtos:
+                    self.vendas_produtos[it['nome']] += it['qtd']
+                elif it['tipo'] == 'servico' and it['nome'] in self.vendas_servicos:
+                    self.vendas_servicos[it['nome']] += it['qtd']
+                    
+            messagebox.showinfo("Venda Finalizada", f"Venda nº finalizada com sucesso!\nTotal: R$ {total:.2f}")
+            self.carrinho_cliente = None
+            self.carrinho_itens = []
+            self.tela_registro_venda()  # Refresh the screen
+        else:
+            messagebox.showerror("Erro", "Falha ao registrar venda.")

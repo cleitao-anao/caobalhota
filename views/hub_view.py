@@ -55,7 +55,8 @@ class HubView(ctk.CTkFrame):
         opts = {"fg_color": "transparent", "text_color": COR_TEXTO_NAV, "hover_color": COR_BOTAO_HOVER, "corner_radius": 20, "width": 110, "font": ("Inter", 13, "bold")}
         ctk.CTkButton(self.nav_btns, text="Dashboard", command=self.controller.mostrar_controle, **opts).pack(side="left", padx=5)
         ctk.CTkButton(self.nav_btns, text="Cadastrar", command=self.controller.abrir_modal_cadastro, **opts).pack(side="left", padx=5)
-        ctk.CTkButton(self.nav_btns, text="🛒 Loja Petz", command=self.controller.tela_registros, **opts).pack(side="left", padx=5)
+        ctk.CTkButton(self.nav_btns, text="🛒 Loja / Serviços", command=self.controller.tela_registros, **opts).pack(side="left", padx=5)
+        ctk.CTkButton(self.nav_btns, text="💰 Caixa PDV", command=self.controller.tela_registro_venda, fg_color=COR_SUCESSO, text_color="#FFF", hover_color="#218838", corner_radius=20, width=110, font=("Inter", 13, "bold")).pack(side="left", padx=5)
 
         self.content_area = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.content_area.pack(fill="both", expand=True, padx=30, pady=20)
@@ -643,3 +644,193 @@ class HubView(ctk.CTkFrame):
             ctk.CTkLabel(info, text=f"Dono: {a['humano']}", font=("Inter", 12), text_color="gray").pack(anchor="w")
             ctk.CTkLabel(f, text=a['servico'], font=("Inter", 12, "bold"), fg_color=COR_BOTAO_ACCENT, text_color="#000", corner_radius=10, width=180, height=35).pack(side="right", padx=30)
         ctk.CTkButton(self.content_area, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=20)
+
+    # ================= REGISTRO DE VENDA (PDV) =====================
+    def desenhar_tela_registro_venda(self):
+        self.limpar_tela()
+        self.controller.current_screen = "venda"
+        
+        # Header
+        top_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        top_frame.pack(fill="x", pady=10)
+        ctk.CTkLabel(top_frame, text="💰 Fechamento de Venda", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left", padx=20)
+
+        main_split = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        main_split.pack(fill="both", expand=True, padx=20)
+        
+        left_panel = ctk.CTkFrame(main_split, fg_color="transparent")
+        left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        right_panel = ctk.CTkFrame(main_split, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA, width=350)
+        right_panel.pack(side="right", fill="y")
+        right_panel.pack_propagate(False)
+
+        # -- LEFT PANEL: Busca Cliente & Itens Disponíveis --
+        
+        # 1. Seleção de Cliente
+        cli_frame = ctk.CTkFrame(left_panel, fg_color=COR_CARD, corner_radius=10, border_width=1, border_color=COR_BORDA)
+        cli_frame.pack(fill="x", pady=(0, 10))
+        
+        cli_header = ctk.CTkFrame(cli_frame, fg_color="transparent")
+        cli_header.pack(fill="x", padx=10, pady=5)
+        
+        ctk.CTkLabel(cli_header, text="1. Selecionar Cliente", font=("Inter", 16, "bold"), text_color=COR_TEXTO_TITULO).pack(side="left")
+        
+        b_cli = ctk.CTkEntry(cli_header, placeholder_text="Buscar cliente por nome...", width=250)
+        b_cli.pack(side="left", padx=(20, 10))
+        
+        cliente_selecionado_lbl = ctk.CTkLabel(cli_header, text="Nenhum cliente selecionado.", text_color=COR_PERIGO, font=("Inter", 12, "bold"))
+        cliente_selecionado_lbl.pack(side="right", padx=10)
+        
+        btn_limpar = ctk.CTkButton(cli_header, text="❌", width=25, height=25, fg_color="transparent", text_color=COR_PERIGO, hover_color="#f0f0f0")
+        
+        res_list = ctk.CTkScrollableFrame(cli_frame, fg_color="transparent", height=120)
+        res_list.pack(fill="x", padx=10, pady=(0, 10))
+
+        def on_cliente_search(e=None):
+            for w in res_list.winfo_children(): w.destroy()
+            termo = b_cli.get().lower()
+            
+            # Opção Visitante sempre no topo
+            f_vis = ctk.CTkFrame(res_list, fg_color="#F0F0F0")
+            f_vis.pack(fill="x", pady=2)
+            ctk.CTkLabel(f_vis, text="🚶 Visitante (Sem Agenda/Cadastro)", text_color=COR_TEXTO_TITULO).pack(side="left", padx=5)
+            ctk.CTkButton(f_vis, text="Selecionar", width=70, height=25, fg_color=COR_BOTAO_ACCENT, text_color="#000",
+                          command=lambda: set_cliente({'id': 0, 'humano': 'Visitante'})).pack(side="right", padx=5)
+
+            resultados = self.controller.clientes
+            if termo:
+                resultados = [c for c in self.controller.clientes if termo in c[1].lower()]
+                
+            for c in resultados:
+                # c: (id, nome, cpf, telefone, email, endereco, admin)
+                f = ctk.CTkFrame(res_list, fg_color="#F0F0F0")
+                f.pack(fill="x", pady=2)
+                ctk.CTkLabel(f, text=c[1], text_color=COR_TEXTO_TITULO).pack(side="left", padx=5)
+                ctk.CTkButton(f, text="Selecionar", width=70, height=25, fg_color=COR_NAVBAR, 
+                              command=lambda cl={'id': c[0], 'humano': c[1]}: set_cliente(cl)).pack(side="right", padx=5)
+                              
+        b_cli.bind("<KeyRelease>", on_cliente_search)
+        on_cliente_search()  # Popular lista inicial
+
+        # 2. Tabs: Serviços Concluídos / Produtos
+        tabview = ctk.CTkTabview(left_panel, fg_color=COR_CARD, border_width=1, border_color=COR_BORDA, corner_radius=10)
+        tabview.pack(fill="both", expand=True)
+        tab_sv = tabview.add("Serviços à Pagar")
+        tab_pr = tabview.add("Produtos Avulsos")
+
+        def limpar_cliente():
+            self.controller.carrinho_cliente = None
+            self.controller.carrinho_itens = []
+            cliente_selecionado_lbl.configure(text="Nenhum cliente selecionado.", text_color=COR_PERIGO)
+            btn_limpar.pack_forget()
+            b_cli.delete(0, 'end')
+            on_cliente_search()
+            for w in tab_sv.winfo_children(): w.destroy()
+            atualizar_carrinho()
+            
+        btn_limpar.configure(command=limpar_cliente)
+
+        def set_cliente(c_dict):
+            # c_dict: {'id', 'humano'}
+            self.controller.carrinho_cliente = c_dict
+            self.controller.carrinho_itens = []
+            cliente_selecionado_lbl.configure(text=f"Cliente: {c_dict['humano']}", text_color=COR_SUCESSO)
+            btn_limpar.pack(side="right", padx=5)
+            for w in res_list.winfo_children(): w.destroy()
+            b_cli.delete(0, 'end')
+            
+            # Load Serviços não pagos
+            servicos = self.controller.buscar_servicos_nao_pagos(c_dict['id'])
+            for w in tab_sv.winfo_children(): w.destroy()
+            if not servicos:
+                ctk.CTkLabel(tab_sv, text="Não há serviços pendentes de pagamento.", text_color="gray").pack(pady=20)
+            else:
+                for s in servicos:
+                    f = ctk.CTkFrame(tab_sv, fg_color="#F9F9F9"); f.pack(fill="x", pady=2)
+                    ctk.CTkLabel(f, text=f"{s[1]} (Pet: {s[3]})", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(side="left", padx=10)
+                    ctk.CTkLabel(f, text=f"R$ {s[2]:.2f}", font=("Inter", 13), text_color="#000").pack(side="left", padx=10)
+                    ctk.CTkButton(f, text="+ Adicionar", fg_color=COR_SUCESSO, width=80, height=25,
+                                  command=lambda ag_id=s[0], sn=s[1], pr=s[2]: add_item('servico', sn, pr, ag_id=ag_id)).pack(side="right", padx=10)
+            
+            atualizar_carrinho()
+
+        # Popular a Tab de Produtos
+        b_prod = ctk.CTkEntry(tab_pr, placeholder_text="Buscar produto...")
+        b_prod.pack(fill="x", pady=5, padx=10)
+        p_list = ctk.CTkScrollableFrame(tab_pr, fg_color="transparent")
+        p_list.pack(fill="both", expand=True)
+        
+        def render_produtos(termo=""):
+            for w in p_list.winfo_children(): w.destroy()
+            for p in self.controller.produtos:
+                if termo in p[2].lower() and p[5] > 0:
+                    f = ctk.CTkFrame(p_list, fg_color="#F9F9F9"); f.pack(fill="x", pady=2)
+                    ctk.CTkLabel(f, text=p[2], width=150, anchor="w", text_color=COR_TEXTO_TITULO).pack(side="left", padx=10)
+                    ctk.CTkLabel(f, text=f"R$ {p[4]:.2f} (Est: {p[5]})", text_color="#000").pack(side="left", padx=10)
+                    ctk.CTkButton(f, text="+ Add", fg_color=COR_SUCESSO, width=60, height=25,
+                                  command=lambda id_p=p[0], nom=p[2], prc=p[4], est=p[5]: add_item('produto', nom, prc, id_p=id_p, estoque_max=est)).pack(side="right", padx=10)
+        
+        b_prod.bind("<KeyRelease>", lambda e: render_produtos(b_prod.get().lower()))
+        render_produtos()
+
+        # -- RIGHT PANEL: Carrinho --
+        ctk.CTkLabel(right_panel, text="🛒 Subtotal", font=("Inter", 18, "bold"), text_color=COR_TEXTO_TITULO).pack(pady=15)
+        cart_list = ctk.CTkScrollableFrame(right_panel, fg_color="transparent")
+        cart_list.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        lbl_total = ctk.CTkLabel(right_panel, text="Total: R$ 0.00", font=("Inter", 22, "bold"), text_color=COR_NAVBAR)
+        lbl_total.pack(pady=10)
+        
+        ctk.CTkButton(right_panel, text="Finalizar Venda", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 16, "bold"), height=50, 
+                      command=self.controller.fechar_venda).pack(fill="x", padx=20, pady=20)
+
+        def add_item(tipo, nome, preco, id_p=None, ag_id=None, estoque_max=None):
+            if not self.controller.carrinho_cliente:
+                messagebox.showwarning("Aviso", "Selecione o Cliente primeiro.")
+                return
+            
+            # Checar se ja ta no carrinho 
+            for it in self.controller.carrinho_itens:
+                if tipo == 'produto' and it['id'] == id_p:
+                    if estoque_max is not None and it['qtd'] >= estoque_max:
+                        messagebox.showwarning("Estoque Insuficiente", f"Você não pode adicionar mais de {estoque_max} unidades de {nome} (estoque esgotado).")
+                        return
+                    it['qtd'] += 1
+                    atualizar_carrinho()
+                    return
+                elif tipo == 'servico' and it['id_agendamento'] == ag_id:
+                    messagebox.showinfo("Aviso", "Serviço já adicionado.")
+                    return
+            
+            if tipo == 'produto' and estoque_max is not None and estoque_max < 1:
+                 messagebox.showwarning("Estoque Insuficiente", f"O produto {nome} está esgotado.")
+                 return
+
+            novo = {'tipo': tipo, 'id': id_p if id_p else 0, 'nome': nome, 'preco': preco, 'qtd': 1, 'id_agendamento': ag_id}
+            self.controller.carrinho_itens.append(novo)
+            atualizar_carrinho()
+
+        def remover_item(idx):
+            self.controller.carrinho_itens.pop(idx)
+            atualizar_carrinho()
+
+        def atualizar_carrinho():
+            for w in cart_list.winfo_children(): w.destroy()
+            total = 0
+            for i, it in enumerate(self.controller.carrinho_itens):
+                f = ctk.CTkFrame(cart_list, fg_color="#F0F0F0")
+                f.pack(fill="x", pady=2)
+                sub = it['preco'] * it['qtd']
+                total += sub
+                
+                texto = f"{it['qtd']}x {it['nome']} - R${sub:.2f}"
+                ctk.CTkLabel(f, text=texto, text_color=COR_TEXTO_TITULO, font=("Inter", 12)).pack(side="left", padx=5)
+                ctk.CTkButton(f, text="X", width=25, height=25, fg_color=COR_PERIGO, 
+                              command=lambda idx=i: remover_item(idx)).pack(side="right", padx=5)
+            
+            lbl_total.configure(text=f"Total: R$ {total:.2f}")
+
+        # Se ja tiver um carrinho ativo (caso refresh da tela pos-venda), re-renderize
+        if self.controller.carrinho_cliente:
+            set_cliente(self.controller.carrinho_cliente)
