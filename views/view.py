@@ -24,6 +24,6 @@ class LoginView(ctk.CTkFrame):
         self.btn_login.place(relx=0.5, rely=0.75, anchor="center")
 
     def _handle_login(self):
-        email = self.email_entry.get()
-        senha = self.senha_entry.get()
+        email = self.email_entry.get().strip()
+        senha = self.senha_entry.get().strip()
         self.on_login_click(email, senha)

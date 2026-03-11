@@ -1,7 +1,8 @@
 from views.hub_view import HubView, SENHA_ADMIN
 from tkinter import messagebox
 from model.produto import ProdutoModel
-
+from model.cliente import ClienteModel
+from model.pet import PetModel
 class HubPage:
     def __init__(self, master):
         self.master = master
@@ -12,7 +13,7 @@ class HubPage:
         self.vendas_servicos = {s: 0 for s in ["Tosa", "Banho", "Hidratação", "Unhas", "Ouvidos", "Taxi Pet", "Hospedagem", "Adestramento", "Consulta", "Vacina"]}
         # Real product list from DB
         self.produtos = []
-        self.clientes_cadastrados = []
+        self.clientes = []  # Array of tuples: (id, nome, cpf, telefone, email, endereco, admin)
         self.agendamentos = [] 
         self.funcionarios = ["Carlos  (Dono)", "Ana Costa", "Lucas "]
 
@@ -66,8 +67,43 @@ class HubPage:
     def tela_agenda(self):
         self.view.desenhar_tela_agenda()
 
+    def carregar_clientes(self):
+        self.clientes = ClienteModel.listar_todos()
+
+    def tela_cadastro(self):
+        self.carregar_clientes()
+        self.view.desenhar_tela_cadastro()
+
+    def tela_pets_cliente(self, cliente):
+        self.view.desenhar_tela_pets_cliente(cliente)
+
+    def excluir_cliente_logica(self, id_cliente):
+        if messagebox.askyesno("Confirmar", "Deseja excluir este cliente e todos os seus pets?"):
+            if ClienteModel.deletar(id_cliente):
+                messagebox.showinfo("Sucesso", "Cliente excluído!")
+                self.tela_cadastro()
+            else:
+                messagebox.showerror("Erro", "Falha ao excluir cliente.")
+
+    def excluir_pet_logica(self, cliente, id_pet):
+        if messagebox.askyesno("Confirmar", "Deseja excluir este pet?"):
+            if PetModel.deletar(id_pet):
+                messagebox.showinfo("Sucesso", "Pet excluído!")
+                self.tela_pets_cliente(cliente)
+            else:
+                messagebox.showerror("Erro", "Falha ao excluir pet.")
+
     def abrir_modal_cadastro(self, item_para_venda=None, tipo_venda=None):
         self.view.abrir_modal_cadastro(item_para_venda, tipo_venda)
+
+    def salvar_cliente_com_pet(self, dados):
+        # dados is a dict from hub_view matching the old format: {"humano": "", "cpf": "", "telefone": "", "endereco": "", "email": "", "pets": [{nome, especie, raca, idade, porte, cuidados_especiais}]}
+        id_cliente = ClienteModel.inserir(dados['humano'], dados['cpf'], dados['telefone'], dados.get('email', ''), dados['endereco'])
+        if id_cliente:
+            for p in dados.get('pets', []):
+                PetModel.inserir(id_cliente, p['nome'], p['especie'], p['raca'], p['idade'], p.get('porte', ''), p.get('cuidados_especiais', ''))
+            return id_cliente
+        return None
 
     # CRUD DE PRODUTO ------------------------------------------
     def carregar_produtos(self):
@@ -136,6 +172,7 @@ class HubPage:
         else:
             self.vendas_servicos[item] += 1
             if cliente:
+                pets_str = ", ".join(p.get("nome", "") for p in cliente.get("pets", [])) if "pets" in cliente else cliente.get("pet", "Desconhecido")
                 info_servico = f"{item} ({data_hora})" if data_hora else item
-                self.agendamentos.append({"humano": cliente['humano'], "pet": cliente['pet'], "servico": info_servico})
+                self.agendamentos.append({"humano": cliente.get('humano', ''), "pet": pets_str, "servico": info_servico})
         messagebox.showinfo("Sucesso", f"{item} concluído!")

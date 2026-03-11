@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from tkcalendar import DateEntry 
+from model.pet import PetModel
+from model.cliente import ClienteModel
 
 # =================================================================
 # gerais cores 
@@ -80,7 +82,7 @@ class HubView(ctk.CTkFrame):
         grid = ctk.CTkFrame(self.content_area, fg_color="transparent")
         grid.pack(expand=True, fill="both")
         
-        menu = [("AGENDA", "📅", self.controller.tela_agenda), ("ESTOQUE", "📦", self.controller.tela_estoque_visualizacao), ("EQUIPE", "👥", self.controller.tela_funcionarios), ("RELATÓRIOS", "📊", self.controller.tela_vendas)]
+        menu = [("AGENDA", "📅", self.controller.tela_agenda), ("CLIENTES", "👥", self.controller.tela_cadastro), ("ESTOQUE", "📦", self.controller.tela_estoque_visualizacao), ("EQUIPE", "👥", self.controller.tela_funcionarios), ("RELATÓRIOS", "📊", self.controller.tela_vendas)]
         
         for i, (t, icon, cmd) in enumerate(menu):
             f = ctk.CTkFrame(grid, fg_color=COR_CARD, corner_radius=20, border_width=1, border_color=COR_BORDA)
@@ -95,55 +97,284 @@ class HubView(ctk.CTkFrame):
         ent.pack(fill="x", pady=5, padx=10)
         return ent
 
-    def abrir_modal_cadastro(self, item_para_venda=None, tipo_venda=None):
+    def desenhar_tela_cadastro(self):
+        self.limpar_tela()
+        self.controller.current_screen = "cadastro"
+        header_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(10, 20))
+        ctk.CTkLabel(header_frame, text="👥 Gestão de Clientes & Pets", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left", padx=20)
+        ctk.CTkButton(header_frame, text="+ Novo Cliente", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), width=180, height=40, corner_radius=10, command=self.controller.abrir_modal_cadastro).pack(side="right", padx=20)
+        scroll = ctk.CTkScrollableFrame(self.content_area, width=1000, height=500, fg_color=COR_CARD, border_width=1, border_color=COR_BORDA, corner_radius=15)
+        scroll.pack(padx=20, fill="both", expand=True)
+        if not self.controller.clientes:
+            ctk.CTkLabel(scroll, text="Nenhum cliente cadastrado ainda.", text_color="gray", font=("Inter", 16)).pack(pady=50)
+        for i, cliente_row in enumerate(self.controller.clientes):
+            # cliente_row format: (id, nome, cpf, telefone, email, endereco, admin)
+            c_id = cliente_row[0]
+            c_nome = cliente_row[1]
+            c_cpf = cliente_row[2]
+            c_telefone = cliente_row[3]
+            c_email = cliente_row[4]
+            c_endereco = cliente_row[5]
+
+            # Parse cliente as dict for compatibility with modal methods
+            cliente = {
+                'id': c_id, 'humano': c_nome, 'cpf': c_cpf, 
+                'telefone': c_telefone, 'email': c_email, 'endereco': c_endereco
+            }
+            
+            # Fetch pets
+            pets_db = PetModel.listar_por_cliente(c_id)
+            pets = [{'id': p[0], 'nome': p[2], 'especie': p[3], 'raca': p[4], 'idade': p[5], 'porte': p[6], 'cuidados_especiais': p[7]} for p in pets_db]
+            cliente['pets'] = pets
+
+            f = ctk.CTkFrame(scroll, fg_color="#F9F9F9", corner_radius=12, border_width=1, border_color="#EEE")
+            f.pack(fill="x", pady=5, padx=10)
+            info_frame = ctk.CTkFrame(f, fg_color="transparent")
+            info_frame.pack(side="left", padx=20, pady=10)
+            ctk.CTkLabel(info_frame, text=f"👤 {c_nome}", font=("Inter", 15, "bold"), text_color=COR_NAVBAR).pack(anchor="w")
+            
+            pets_str = ", ".join([p.get('nome', '') for p in pets])
+            ctk.CTkLabel(info_frame, text=f"🐾 Pets: {pets_str}", font=("Inter", 12), text_color=COR_TEXTO_PADRAO).pack(anchor="w")
+
+            btn_area = ctk.CTkFrame(f, fg_color="transparent")
+            btn_area.pack(side="right", padx=15)
+            ctk.CTkButton(btn_area, text="🐾 Pets", width=65, height=30, fg_color=COR_ACCENT, text_color="#000", font=("Inter", 11, "bold"), command=lambda c=cliente: self.controller.tela_pets_cliente(c)).pack(side="left", padx=5)
+            ctk.CTkButton(btn_area, text="Editar", width=65, height=30, fg_color=COR_NAVBAR, command=lambda c=cliente: self.editar_cliente_modal(c)).pack(side="left", padx=5)
+            ctk.CTkButton(btn_area, text="Excluir", width=65, height=30, fg_color=COR_PERIGO, command=lambda id_c=c_id: self.controller.excluir_cliente_logica(id_c)).pack(side="left", padx=5)
+        ctk.CTkButton(self.content_area, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=20)
+
+    def desenhar_tela_pets_cliente(self, cliente):
+        self.limpar_tela()
+        self.controller.current_screen = "pets_cliente"
+        
+        topo_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        topo_frame.pack(fill="x", pady=(10, 20), padx=20)
+        
+        titulo_texto = f"🐾 Pets de {cliente.get('humano', 'Cliente')}"
+        ctk.CTkLabel(topo_frame, text=titulo_texto, font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left")
+        ctk.CTkButton(topo_frame, text="+ Novo Pet", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), width=150, height=40, corner_radius=10, 
+                      command=lambda: self.modal_pet_adicional(cliente)).pack(side="right")
+
+        scroll = ctk.CTkScrollableFrame(self.content_area, width=1000, height=500, fg_color=COR_CARD, border_width=1, border_color=COR_BORDA, corner_radius=15)
+        scroll.pack(padx=20, fill="both", expand=True)
+
+        pets = cliente.get('pets', [])
+        
+        if not pets:
+            ctk.CTkLabel(scroll, text="Nenhum pet cadastrado para este cliente.", text_color="gray", font=("Inter", 16)).pack(pady=50)
+        
+        for i, pet in enumerate(pets):
+            f = ctk.CTkFrame(scroll, fg_color="#F9F9F9", corner_radius=12, border_width=1, border_color="#EEE")
+            f.pack(fill="x", pady=5, padx=10)
+            
+            info_frame = ctk.CTkFrame(f, fg_color="transparent")
+            info_frame.pack(side="left", padx=20, pady=10)
+            
+            ctk.CTkLabel(info_frame, text=f"🐾 {pet.get('nome', 'Sem Nome')}", font=("Inter", 15, "bold"), text_color=COR_NAVBAR).pack(anchor="w")
+            
+            detalhes = f"Espécie: {pet.get('especie', '-')} | Raça: {pet.get('raca', '-')} | Idade: {pet.get('idade', '-')}"
+            ctk.CTkLabel(info_frame, text=detalhes, font=("Inter", 12), text_color=COR_TEXTO_PADRAO).pack(anchor="w")
+            
+            btn_area = ctk.CTkFrame(f, fg_color="transparent")
+            btn_area.pack(side="right", padx=15)
+            
+            ctk.CTkButton(btn_area, text="Editar", width=65, height=30, fg_color=COR_NAVBAR, 
+                          command=lambda c=cliente, p=pet: self.modal_pet_adicional(c, p)).pack(side="left", padx=5)
+            ctk.CTkButton(btn_area, text="Excluir", width=65, height=30, fg_color=COR_PERIGO, 
+                          command=lambda c=cliente, p=pet: self.controller.excluir_pet_logica(c, p['id'])).pack(side="left", padx=5)
+
+        ctk.CTkButton(self.content_area, text="Voltar", command=self.controller.tela_cadastro, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=20)
+
+
+    def modal_pet_adicional(self, cliente, pet_editado=None):
         modal = ctk.CTkToplevel(self)
-        modal.geometry("600x750")
-        modal.title("Novo Cadastro")
-        modal.configure(fg_color=COR_FUNDO_EXTERNO)
+        modal.geometry("400x650")
+        
+        is_edit = pet_editado is not None
+        titulo = f"Editar Pet: {pet_editado['nome']}" if is_edit else f"Novo Pet para {cliente.get('humano', '')}"
+        
+        modal.title(titulo)
         modal.attributes("-topmost", True)
         modal.grab_set()
-
-        scroll = ctk.CTkScrollableFrame(modal, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
-        scroll.pack(fill="both", expand=True, padx=30, pady=30)
-
-        ctk.CTkLabel(scroll, text="👤 Informações do Cliente", font=("Inter", 20, "bold"), text_color=COR_NAVBAR).pack(pady=10, anchor="w", padx=10)
-        ent_nome = self.criar_input(scroll, "Nome Completo")
-        ent_cpf = self.criar_input(scroll, "CPF")
-        ent_tel = self.criar_input(scroll, "Telefone")
-        ent_end = self.criar_input(scroll, "Endereço")
-
-        ctk.CTkLabel(scroll, text="🐾 Informações do Pet", font=("Inter", 20, "bold"), text_color=COR_NAVBAR).pack(pady=(20,10), anchor="w", padx=10)
-        ent_pet_nome = self.criar_input(scroll, "Nome do Pet")
+        ctk.CTkLabel(modal, text=f"🐾 {titulo}", font=("Inter", 20, "bold"), text_color=COR_NAVBAR).pack(pady=20)
+        
+        ent_pet_nome = self.criar_input(modal, "Nome do Pet")
         
         def on_especie_change(escolha):
             if escolha == "Outro": ent_custom.pack(fill="x", pady=5, padx=10)
             else: ent_custom.pack_forget()
-
-        ent_especie = ctk.CTkOptionMenu(scroll, values=["Cão", "Gato", "Pássaro", "Outro"], 
-                                        command=on_especie_change, fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+            
+        ent_especie = ctk.CTkOptionMenu(modal, values=["Cão", "Gato", "Pássaro", "Outro"], command=on_especie_change, fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
         ent_especie.pack(fill="x", pady=5, padx=10)
+        ent_custom = ctk.CTkEntry(modal, placeholder_text="Qual espécie?", fg_color=COR_INPUT_BG, text_color=COR_INPUT_TEXTO)
         
-        ent_custom = ctk.CTkEntry(scroll, placeholder_text="Qual espécie?", fg_color=COR_INPUT_BG, text_color=COR_INPUT_TEXTO)
+        ent_raca = self.criar_input(modal, "Raça")
+        ent_idade = self.criar_input(modal, "Idade")
         
-        ent_raca = self.criar_input(scroll, "Raça")
-        ent_idade = self.criar_input(scroll, "Idade")
+        ent_porte = ctk.CTkOptionMenu(modal, values=["pequeno", "médio", "grande"], fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        ent_porte.pack(fill="x", pady=5, padx=10)
+        ent_cuidados = self.criar_input(modal, "Cuidados Especiais")
+        
+        if is_edit:
+            pet_atual = pet_editado
+            ent_pet_nome.insert(0, pet_atual.get('nome', ''))
+            
+            esp_atual = pet_atual.get('especie', 'Cão')
+            if esp_atual in ["Cão", "Gato", "Pássaro"]:
+                ent_especie.set(esp_atual)
+            else:
+                ent_especie.set("Outro")
+                on_especie_change("Outro")
+                ent_custom.insert(0, esp_atual)
+                
+            ent_raca.insert(0, pet_atual.get('raca', ''))
+            ent_idade.insert(0, pet_atual.get('idade', ''))
+            
+            porte_atual = pet_atual.get('porte', 'médio')
+            if porte_atual in ["pequeno", "médio", "grande"]:
+                ent_porte.set(porte_atual)
+            else:
+                ent_porte.set("médio")
+            ent_cuidados.insert(0, pet_atual.get('cuidados_especiais', ''))
 
         def salvar():
-            esp = ent_custom.get() if ent_especie.get() == "Outro" else ent_especie.get()
-            if not ent_nome.get() or not ent_pet_nome.get():
-                messagebox.showwarning("Atenção", "Preencha os campos obrigatórios!")
+            if not ent_pet_nome.get(): 
+                messagebox.showwarning("Atenção", "O nome do pet é obrigatório!")
                 return
-            dados = {"humano": ent_nome.get(), "pet": ent_pet_nome.get(), "especie": esp}
-            self.controller.clientes_cadastrados.append(dados)
+            esp = ent_custom.get() if ent_especie.get() == "Outro" else ent_especie.get()
+            
+            if 'pets' not in cliente: cliente['pets'] = []
+            
+            dados_pet = {"nome": ent_pet_nome.get(), "especie": esp, "raca": ent_raca.get(), "idade": ent_idade.get()}
+            
+            if is_edit:
+                PetModel.atualizar(pet_editado['id'], ent_pet_nome.get(), esp, ent_raca.get(), ent_idade.get(), ent_porte.get(), ent_cuidados.get())
+                msg = f"{ent_pet_nome.get()} atualizado!"
+            else:
+                PetModel.inserir(cliente['id'], ent_pet_nome.get(), esp, ent_raca.get(), ent_idade.get(), ent_porte.get(), ent_cuidados.get())
+                msg = f"{ent_pet_nome.get()} adicionado à família!"
+                
             modal.destroy()
+            
+            # Re-fetch pets to update the cliente dict
+            pets_db = PetModel.listar_por_cliente(cliente['id'])
+            cliente['pets'] = [{'id': p[0], 'nome': p[2], 'especie': p[3], 'raca': p[4], 'idade': p[5], 'porte': p[6], 'cuidados_especiais': p[7]} for p in pets_db]
+            
+            self.controller.tela_pets_cliente(cliente)
+            messagebox.showinfo("Sucesso", msg)
+            
+        ctk.CTkButton(modal, text="Salvar Pet", fg_color=COR_SUCESSO, command=salvar, height=45).pack(pady=30)
+
+    def editar_cliente_modal(self, cliente):
+        modal = ctk.CTkToplevel(self)
+        modal.geometry("450x600")
+        modal.title("Editar Cliente")
+        modal.attributes("-topmost", True)
+        modal.grab_set()
+        ctk.CTkLabel(modal, text="✏️ Editar Informações", font=("Inter", 20, "bold"), text_color=COR_NAVBAR).pack(pady=20)
+        ent_nome = self.criar_input(modal, "Nome do Humano"); ent_nome.insert(0, cliente.get('humano', ""))
+        ent_cpf = self.criar_input(modal, "CPF"); ent_cpf.insert(0, cliente.get('cpf', ""))
+        ent_tel = self.criar_input(modal, "Telefone"); ent_tel.insert(0, cliente.get('telefone', ""))
+        ent_email = self.criar_input(modal, "E-mail"); ent_email.insert(0, cliente.get('email', ""))
+        ent_end = self.criar_input(modal, "Endereço"); ent_end.insert(0, cliente.get('endereco', ""))
+        def salvar_edicao():
+            if ClienteModel.atualizar(cliente['id'], ent_nome.get(), ent_cpf.get(), ent_tel.get(), ent_email.get(), ent_end.get()):
+                modal.destroy()
+                self.controller.tela_cadastro()
+                messagebox.showinfo("Sucesso", "Registro atualizado!")
+            else:
+                messagebox.showerror("Erro", "Erro ao atualizar registro.")
+        ctk.CTkButton(modal, text="Salvar Alterações", fg_color=COR_SUCESSO, command=salvar_edicao, height=45).pack(pady=30, padx=20, fill="x")
+
+    def abrir_modal_cadastro(self, item_para_venda=None, tipo_venda=None):
+        modal = ctk.CTkToplevel(self)
+        modal.geometry("600x700") 
+        modal.title("Novo Cadastro")
+        modal.configure(fg_color=COR_FUNDO_EXTERNO)
+        modal.attributes("-topmost", True); modal.grab_set()
+        tabview = ctk.CTkTabview(modal, fg_color=COR_CARD, border_width=1, border_color=COR_BORDA, corner_radius=15)
+        tabview.pack(fill="both", expand=True, padx=20, pady=(20, 10))
+        tab_cliente = tabview.add("👤 Cadastro Cliente")
+        tab_pet = tabview.add("🐾 Cadastro Pet")
+        
+        ent_nome = self.criar_input(tab_cliente, "Nome Completo")
+        ent_cpf = self.criar_input(tab_cliente, "CPF")
+        ent_tel = self.criar_input(tab_cliente, "Telefone")
+        ent_email = self.criar_input(tab_cliente, "E-mail")
+        ent_end = self.criar_input(tab_cliente, "Endereço")
+        
+        ent_pet_nome = self.criar_input(tab_pet, "Nome do Pet")
+        ent_especie = ctk.CTkOptionMenu(tab_pet, values=["Cão", "Gato", "Pássaro", "Outro"], fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        ent_especie.pack(fill="x", pady=5, padx=10)
+        ent_raca = self.criar_input(tab_pet, "Raça")
+        ent_idade = self.criar_input(tab_pet, "Idade (ex: 2 anos)")
+
+        ent_porte = ctk.CTkOptionMenu(tab_pet, values=["pequeno", "médio", "grande"], fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        ent_porte.pack(fill="x", pady=5, padx=10)
+        ent_cuidados = self.criar_input(tab_pet, "Cuidados Especiais")
+
+        def salvar():
+            if not ent_nome.get():
+                messagebox.showwarning("Atenção", "Preencha o Nome do Cliente!"); return
+            # Check if user tried to fill pet data without a name
+            pet_nome_val = ent_pet_nome.get().strip()
+            pet_raca_val = ent_raca.get().strip()
+            pet_idade_val = ent_idade.get().strip()
+            pet_cuida_val = ent_cuidados.get().strip()
+            
+            tem_dado_pet = bool(pet_raca_val or pet_idade_val or pet_cuida_val)
+            
+            if tem_dado_pet and not pet_nome_val:
+                messagebox.showwarning("Atenção", "Você começou a preencher os dados do Pet. O Nome do Pet é obrigatório!")
+                return
+                
+            dados = {
+                "humano": ent_nome.get(), 
+                "cpf": ent_cpf.get(), 
+                "telefone": ent_tel.get(),
+                "email": ent_email.get(),
+                "endereco": ent_end.get(), 
+                "pets": []
+            }
+
+            if pet_nome_val:
+                dados["pets"].append({
+                    "nome": pet_nome_val, 
+                    "especie": ent_especie.get(),
+                    "raca": pet_raca_val,
+                    "idade": pet_idade_val,
+                    "porte": ent_porte.get(),
+                    "cuidados_especiais": pet_cuida_val
+                })
+            
+            id_novo = self.controller.salvar_cliente_com_pet(dados)
+            if id_novo:
+                pass # success
+            else:
+                messagebox.showerror("Erro", "Erro ao cadastrar!")
+                return
+                
+            modal.destroy()
+            messagebox.showinfo("Petz", "Cadastrado!")
+            
+            # Re-fetch the updated format for the rest of checkout flow
+            if item_para_venda:
+                # Mock cliente to fit the current checkout expectations
+                cliente_mock = {
+                    'id': id_novo, 'humano': dados['humano'], 'cpf': dados['cpf'],
+                    'telefone': dados['telefone'], 'endereco': dados['endereco'],
+                    'pets': dados['pets']
+                }
+                
+            if hasattr(self.controller, "current_screen") and self.controller.current_screen == "cadastro": self.controller.tela_cadastro()
             if item_para_venda: 
                 if tipo_venda == "servico":
-                    self.abrir_modal_data_hora(item_para_venda, dados)
+                    self.abrir_modal_data_hora(item_para_venda, cliente_mock)
                 else:
-                    self.controller.finalizar_venda_logica(item_para_venda, tipo_venda, cliente=dados)
-            messagebox.showinfo("Petz", f"Bem-vindo(a), {ent_nome.get()}!")
-
-        ctk.CTkButton(modal, text="Finalizar Cadastro", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 14, "bold"), height=50, command=salvar).pack(pady=20)
+                    self.controller.finalizar_venda_logica(item_para_venda, tipo_venda, cliente=cliente_mock)
+        
+        ctk.CTkButton(modal, text="Finalizar Cadastro", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 14, "bold"), height=50, command=salvar).pack(pady=20, padx=20, fill="x")
 
     def desenhar_tela_registros(self):
         self.limpar_tela()
@@ -201,13 +432,22 @@ class HubView(ctk.CTkFrame):
         def atualizar_busca(event=None):
             for w in lista_busca.winfo_children(): w.destroy()
             termo = busca_ent.get().lower()
-            for c in self.controller.clientes_cadastrados:
-                if termo in c['humano'].lower():
+            for c_row in self.controller.clientes:
+                # c_row: (id, nome, cpf, telefone, email, endereco, admin)
+                c_id, c_nome = c_row[0], c_row[1]
+                if termo in c_nome.lower():
                     f_res = ctk.CTkFrame(lista_busca, fg_color="#F9F9F9", height=40)
                     f_res.pack(fill="x", pady=2)
-                    ctk.CTkLabel(f_res, text=f"{c['humano']} ({c['pet']})", text_color=COR_TEXTO_TITULO, font=("Inter", 12)).pack(side="left", padx=10)
+                    
+                    pets_db = PetModel.listar_por_cliente(c_id)
+                    pets_str = ", ".join(p[2] for p in pets_db)
+                    
+                    # Create mock dict for check/out flow
+                    c_dict = {'id': c_id, 'humano': c_nome, 'pets': [{'nome': p[2]} for p in pets_db]}
+                    
+                    ctk.CTkLabel(f_res, text=f"{c_nome} ({pets_str})", text_color=COR_TEXTO_TITULO, font=("Inter", 12)).pack(side="left", padx=10)
                     ctk.CTkButton(f_res, text="Selecionar", width=80, height=24, fg_color=COR_SUCESSO, 
-                                  command=lambda cl=c: [pop.destroy(), self.abrir_modal_data_hora(item, cl) if tipo == "servico" else self.controller.finalizar_venda_logica(item, tipo, cl)]).pack(side="right", padx=5)
+                                  command=lambda cl=c_dict: [pop.destroy(), self.abrir_modal_data_hora(item, cl) if tipo == "servico" else self.controller.finalizar_venda_logica(item, tipo, cl)]).pack(side="right", padx=5)
 
         busca_ent.bind("<KeyRelease>", atualizar_busca)
         atualizar_busca()
@@ -226,7 +466,8 @@ class HubView(ctk.CTkFrame):
         modal_dt.grab_set()
 
         ctk.CTkLabel(modal_dt, text=f"Agendar {servico}", font=("Inter", 18, "bold"), text_color=COR_NAVBAR).pack(pady=15)
-        ctk.CTkLabel(modal_dt, text=f"Cliente: {cliente['humano']} & {cliente['pet']}", font=("Inter", 12)).pack()
+        pets_str = ", ".join(p.get("nome", "") for p in cliente.get("pets", [])) if "pets" in cliente else cliente.get("pet", "")
+        ctk.CTkLabel(modal_dt, text=f"Cliente: {cliente.get('humano', '')} & {pets_str}", font=("Inter", 12)).pack()
 
         ctk.CTkLabel(modal_dt, text="Selecione a Data:", font=("Inter", 12, "bold")).pack(pady=(20, 5))
         cal = DateEntry(modal_dt, width=12, background=COR_NAVBAR, foreground='white', borderwidth=2, locale='pt_BR')
