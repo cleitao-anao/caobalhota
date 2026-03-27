@@ -5,6 +5,7 @@ from model.cliente import ClienteModel
 from model.pet import PetModel
 from model.agendamento import AgendamentoModel
 from model.venda import VendaModel
+from model.dashboard import DashboardModel
 class HubPage:
     def __init__(self, master):
         self.master = master
@@ -68,8 +69,20 @@ class HubPage:
         self.view.desenhar_tela_funcionarios()
 
     def tela_vendas(self):
-        # A antiga "tela_vendas" da view.py virou "desenhar_tela_relatorios". Vendas será o PDV.
-        self.view.desenhar_tela_vendas()
+        # Redireciona para o novo Dashboard
+        self.tela_dashboard()
+
+    def tela_dashboard(self):
+        self.dashboard_data = {
+            'estoque': DashboardModel.resumo_estoque(),
+            'vendas': DashboardModel.resumo_vendas(),
+            'top_produtos': DashboardModel.top_produtos_vendidos(),
+            'top_servicos': DashboardModel.top_servicos_vendidos(),
+            'agendamentos': DashboardModel.resumo_agendamentos(),
+            'clientes': DashboardModel.resumo_clientes(),
+            'vendas_7dias': DashboardModel.vendas_ultimos_7dias(),
+        }
+        self.view.desenhar_tela_dashboard(self.dashboard_data)
         
     def tela_registro_venda(self):
         # The new POS system logic 

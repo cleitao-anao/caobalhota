@@ -611,21 +611,157 @@ class HubView(ctk.CTkFrame):
         ctk.CTkButton(self.content_area, text="Voltar", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR).pack(pady=20)
 
     def desenhar_tela_vendas(self):
+        # Legacy fallback — redirect to dashboard
+        pass
+
+    def desenhar_tela_dashboard(self, data):
         self.limpar_tela()
-        ctk.CTkLabel(self.content_area, text="📊 Desempenho Mensal", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(pady=20)
-        cont = ctk.CTkScrollableFrame(self.content_area, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
-        cont.pack(fill="both", expand=True, padx=50)
-        for titulo, dados, cor in [("Produtos", self.controller.vendas_produtos, COR_BOTAO_ACCENT), ("Serviços", self.controller.vendas_servicos, COR_NAVBAR)]:
-            ctk.CTkLabel(cont, text=titulo, font=("Inter", 18, "bold"), text_color=COR_TEXTO_TITULO).pack(pady=10, anchor="w", padx=20)
-            total = sum(dados.values())
-            for item, qtd in dados.items():
-                p = (qtd / total * 100) if total > 0 else 0
-                f = ctk.CTkFrame(cont, fg_color="transparent"); f.pack(fill="x", padx=20)
-                ctk.CTkLabel(f, text=f"{item}", width=150, anchor="w", text_color=COR_INPUT_TEXTO).pack(side="left")
-                bg = ctk.CTkFrame(f, fg_color="#EEE", height=12, width=300, corner_radius=6); bg.pack(side="left", padx=10)
-                ctk.CTkFrame(bg, fg_color=cor, height=12, width=(p * 3), corner_radius=6).place(x=0, y=0)
-                ctk.CTkLabel(f, text=f"{p:.1f}%", text_color=COR_INPUT_TEXTO).pack(side="left")
-        ctk.CTkButton(self.content_area, text="Voltar", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR).pack(pady=10)
+        self.controller.current_screen = "dashboard"
+
+        scroll = ctk.CTkScrollableFrame(self.content_area, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+
+        # ===== HEADER =====
+        ctk.CTkLabel(scroll, text="📊 Painel de Controle", font=("Inter", 26, "bold"), text_color=COR_NAVBAR).pack(anchor="w", padx=20, pady=(10, 20))
+
+        # ===== KPI CARDS =====
+        kpi_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        kpi_frame.pack(fill="x", padx=20, pady=(0, 20))
+
+        vendas = data.get('vendas', {})
+        clientes = data.get('clientes', {})
+        estoque = data.get('estoque', {})
+
+        kpis = [
+            ("💰 Faturamento", f"R$ {vendas.get('faturamento', 0):.2f}", COR_SUCESSO),
+            ("🛒 Vendas", str(vendas.get('num_vendas', 0)), COR_NAVBAR),
+            ("🎫 Ticket Médio", f"R$ {vendas.get('ticket_medio', 0):.2f}", "#6f42c1"),
+            ("👥 Clientes", str(clientes.get('total_clientes', 0)), COR_BOTAO_ACCENT),
+            ("🐾 Pets", str(clientes.get('total_pets', 0)), "#e83e8c"),
+            ("📦 Itens Estoque", str(estoque.get('total_itens', 0)), COR_NAVBAR),
+        ]
+
+        for i, (titulo, valor, cor) in enumerate(kpis):
+            card = ctk.CTkFrame(kpi_frame, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+            card.grid(row=0, column=i, padx=8, pady=5, sticky="nsew")
+            kpi_frame.columnconfigure(i, weight=1)
+            ctk.CTkLabel(card, text=titulo, font=("Inter", 12), text_color="#888").pack(pady=(15, 5))
+            ctk.CTkLabel(card, text=valor, font=("Inter", 22, "bold"), text_color=cor).pack(pady=(0, 15))
+
+        # ===== SEÇÃO: ESTOQUE BAIXO =====
+        produtos_baixo = estoque.get('produtos_baixo', [])
+        if produtos_baixo:
+            sec_est = ctk.CTkFrame(scroll, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+            sec_est.pack(fill="x", padx=20, pady=(0, 15))
+            ctk.CTkLabel(sec_est, text="⚠️ Alerta de Estoque Baixo (≤ 5 unidades)", font=("Inter", 16, "bold"), text_color=COR_PERIGO).pack(anchor="w", padx=15, pady=10)
+            for nome, qtd in produtos_baixo:
+                f = ctk.CTkFrame(sec_est, fg_color="transparent")
+                f.pack(fill="x", padx=15, pady=2)
+                ctk.CTkLabel(f, text=f"• {nome}", font=("Inter", 13), text_color="#000", anchor="w").pack(side="left")
+                cor_q = COR_PERIGO if qtd <= 2 else "#FF8C00"
+                ctk.CTkLabel(f, text=f"{qtd} un.", font=("Inter", 13, "bold"), text_color=cor_q).pack(side="right", padx=15)
+
+        # ===== CHARTS ROW: TOP PRODUTOS + TOP SERVIÇOS =====
+        charts_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        charts_frame.pack(fill="x", padx=20, pady=(0, 15))
+        charts_frame.columnconfigure(0, weight=1)
+        charts_frame.columnconfigure(1, weight=1)
+
+        # -- Top Produtos --
+        top_prod = data.get('top_produtos', [])
+        card_tp = ctk.CTkFrame(charts_frame, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        card_tp.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        ctk.CTkLabel(card_tp, text="🏆 Top 5 Produtos Vendidos", font=("Inter", 16, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=15, pady=10)
+        if not top_prod:
+            ctk.CTkLabel(card_tp, text="Nenhuma venda de produto registrada.", text_color="gray").pack(pady=15)
+        else:
+            max_qtd = max(r[1] for r in top_prod) if top_prod else 1
+            for nome, qtd in top_prod:
+                f = ctk.CTkFrame(card_tp, fg_color="transparent")
+                f.pack(fill="x", padx=15, pady=3)
+                ctk.CTkLabel(f, text=nome, width=120, anchor="w", font=("Inter", 12), text_color="#000").pack(side="left")
+                bar_w = max(int((qtd / max_qtd) * 200), 5)
+                bg = ctk.CTkFrame(f, fg_color="#EEE", height=14, width=200, corner_radius=6)
+                bg.pack(side="left", padx=10)
+                ctk.CTkFrame(bg, fg_color=COR_BOTAO_ACCENT, height=14, width=bar_w, corner_radius=6).place(x=0, y=0)
+                ctk.CTkLabel(f, text=str(int(qtd)), font=("Inter", 12, "bold"), text_color="#000").pack(side="left")
+            ctk.CTkFrame(card_tp, fg_color="transparent", height=10).pack()  # spacer
+
+        # -- Top Serviços --
+        top_serv = data.get('top_servicos', [])
+        card_ts = ctk.CTkFrame(charts_frame, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        card_ts.grid(row=0, column=1, padx=(8, 0), sticky="nsew")
+        ctk.CTkLabel(card_ts, text="✂️ Top 5 Serviços Realizados", font=("Inter", 16, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=15, pady=10)
+        if not top_serv:
+            ctk.CTkLabel(card_ts, text="Nenhuma venda de serviço registrada.", text_color="gray").pack(pady=15)
+        else:
+            max_qtd_s = max(r[1] for r in top_serv) if top_serv else 1
+            for nome, qtd in top_serv:
+                f = ctk.CTkFrame(card_ts, fg_color="transparent")
+                f.pack(fill="x", padx=15, pady=3)
+                ctk.CTkLabel(f, text=nome, width=120, anchor="w", font=("Inter", 12), text_color="#000").pack(side="left")
+                bar_w = max(int((qtd / max_qtd_s) * 200), 5)
+                bg = ctk.CTkFrame(f, fg_color="#EEE", height=14, width=200, corner_radius=6)
+                bg.pack(side="left", padx=10)
+                ctk.CTkFrame(bg, fg_color=COR_NAVBAR, height=14, width=bar_w, corner_radius=6).place(x=0, y=0)
+                ctk.CTkLabel(f, text=str(int(qtd)), font=("Inter", 12, "bold"), text_color="#000").pack(side="left")
+            ctk.CTkFrame(card_ts, fg_color="transparent", height=10).pack()
+
+        # ===== AGENDAMENTOS + VENDAS 7 DIAS =====
+        bottom_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        bottom_frame.pack(fill="x", padx=20, pady=(0, 15))
+        bottom_frame.columnconfigure(0, weight=1)
+        bottom_frame.columnconfigure(1, weight=1)
+
+        # -- Agendamentos por Status --
+        ag_data = data.get('agendamentos', {})
+        card_ag = ctk.CTkFrame(bottom_frame, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        card_ag.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        ctk.CTkLabel(card_ag, text="📅 Status dos Agendamentos", font=("Inter", 16, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=15, pady=10)
+
+        status_cores = {
+            'agendado': ('#3498db', '🗓️'),
+            'iniciado': ('#f39c12', '▶️'),
+            'concluído': ('#2ecc71', '✅'),
+            'pago': ('#27ae60', '💵'),
+            'cancelado': ('#e74c3c', '❌'),
+        }
+        ag_grid = ctk.CTkFrame(card_ag, fg_color="transparent")
+        ag_grid.pack(padx=15, pady=10)
+        for i, (status, (cor, ico)) in enumerate(status_cores.items()):
+            count = ag_data.get(status, 0)
+            mini = ctk.CTkFrame(ag_grid, fg_color="#F5F5F5", corner_radius=10, width=100, height=70)
+            mini.grid(row=0, column=i, padx=5, pady=5)
+            mini.grid_propagate(False)
+            ctk.CTkLabel(mini, text=f"{ico} {count}", font=("Inter", 18, "bold"), text_color=cor).place(relx=0.5, rely=0.35, anchor="center")
+            ctk.CTkLabel(mini, text=status.capitalize(), font=("Inter", 10), text_color="#666").place(relx=0.5, rely=0.75, anchor="center")
+
+        # -- Vendas últimos 7 dias --
+        vendas_7 = data.get('vendas_7dias', [])
+        card_v7 = ctk.CTkFrame(bottom_frame, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        card_v7.grid(row=0, column=1, padx=(8, 0), sticky="nsew")
+        ctk.CTkLabel(card_v7, text="📈 Faturamento - Últimos 7 Dias", font=("Inter", 16, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=15, pady=10)
+        if not vendas_7:
+            ctk.CTkLabel(card_v7, text="Sem vendas nos últimos 7 dias.", text_color="gray").pack(pady=15)
+        else:
+            max_val = max(r[1] for r in vendas_7) if vendas_7 else 1
+            chart_area = ctk.CTkFrame(card_v7, fg_color="transparent", height=120)
+            chart_area.pack(fill="x", padx=15, pady=10)
+            for i, (dt, total) in enumerate(vendas_7):
+                col = ctk.CTkFrame(chart_area, fg_color="transparent")
+                col.pack(side="left", expand=True, fill="both")
+                bar_h = max(int((float(total) / float(max_val)) * 80), 5)
+                ctk.CTkLabel(col, text=f"R${float(total):.0f}", font=("Inter", 9), text_color="#666").pack()
+                bar_container = ctk.CTkFrame(col, fg_color="transparent", height=85)
+                bar_container.pack()
+                bar_container.pack_propagate(False)
+                bar = ctk.CTkFrame(bar_container, fg_color=COR_SUCESSO, width=30, height=bar_h, corner_radius=5)
+                bar.pack(side="bottom")
+                dia_str = dt.strftime("%d/%m") if hasattr(dt, 'strftime') else str(dt)
+                ctk.CTkLabel(col, text=dia_str, font=("Inter", 9), text_color="#888").pack()
+
+        # ===== BOTÃO VOLTAR =====
+        ctk.CTkButton(scroll, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=20)
 
     def desenhar_tela_agenda(self):
         self.limpar_tela()
