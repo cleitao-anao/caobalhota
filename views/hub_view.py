@@ -596,18 +596,78 @@ class HubView(ctk.CTkFrame):
                 modal.destroy()
 
         ctk.CTkButton(modal, text="Salvar Produto", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), height=45, command=salvar).pack(pady=(0, 20))
+        
+    def abrir_modal_funcionario(self, funcionario_dados=None):
+        # funcionario_dados seria uma tupla ou dicionário com (id, nome, cargo, telefone, email, login, senha)
+        modal = ctk.CTkToplevel(self)
+        modal.geometry("500x600")
+        titulo = "Novo Funcionário" if not funcionario_dados else f"Editar: {funcionario_dados[1]}"
+        modal.title(titulo)
+        modal.attributes("-topmost", True)
+        modal.grab_set()
+
+        ctk.CTkLabel(modal, text=titulo, font=("Inter", 20, "bold"), text_color=COR_NAVBAR).pack(pady=20)
+        
+        container = ctk.CTkFrame(modal, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        container.pack(fill="both", expand=True, padx=30, pady=(0, 30))
+
+        ent_nome = self.criar_input(container, "Nome Completo *")
+        ent_cargo = self.criar_input(container, "Cargo (ex: Veterinário, Tosador)")
+        ent_tel = self.criar_input(container, "Telefone")
+        ent_email = self.criar_input(container, "E-mail")
+        ent_login = self.criar_input(container, "Login de Acesso")
+        ent_senha = self.criar_input(container, "Senha")
+
+        id_atual = None
+        if funcionario_dados:
+            id_atual = funcionario_dados[0]
+            ent_nome.insert(0, str(funcionario_dados[1]))
+            ent_cargo.insert(0, str(funcionario_dados[2]))
+            # ... preencher os demais campos se necessário ...
+
+        def salvar():
+            if not ent_nome.get() or not ent_login.get():
+                messagebox.showwarning("Aviso", "Nome e Login são obrigatórios.")
+                return
+            
+            # Chama o método no controller (precisaremos criar esse método no hub_page.py)
+            sucesso = self.controller.salvar_funcionario(
+                id_atual, ent_nome.get(), ent_cargo.get(), 
+                ent_tel.get(), ent_email.get(), ent_login.get(), ent_senha.get()
+            )
+            if sucesso:
+                modal.destroy()
+
+        ctk.CTkButton(modal, text="Salvar Funcionário", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), height=45, command=salvar).pack(pady=(0, 20))
 
     def desenhar_tela_funcionarios(self):
         self.limpar_tela()
-        ctk.CTkLabel(self.content_area, text="👥 Nossa Equipe Petz", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(pady=20)
-        scroll = ctk.CTkScrollableFrame(self.content_area, width=600, height=400, fg_color=COR_CARD, border_width=1, border_color=COR_BORDA)
-        scroll.pack()
+        
+        topo = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        topo.pack(fill="x", pady=10)
+        
+        ctk.CTkLabel(topo, text="👥 Nossa Equipe Petz", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left", padx=50)
+        
+        if self.controller.is_admin:
+            ctk.CTkButton(topo, text="+ Novo Funcionário", fg_color=COR_BOTAO_ACCENT, text_color="#000", 
+                          command=self.abrir_modal_funcionario).pack(side="right", padx=50)
+
+        scroll = ctk.CTkScrollableFrame(self.content_area, width=850, height=400, fg_color=COR_CARD, border_width=1, border_color=COR_BORDA)
+        scroll.pack(padx=50)
+        
         for func in self.controller.funcionarios:
             f = ctk.CTkFrame(scroll, fg_color="#F9F9F9", corner_radius=10)
             f.pack(fill="x", pady=5, padx=10)
-            ctk.CTkLabel(f, text=f"   {func}", font=("Inter", 14), text_color=COR_INPUT_TEXTO).pack(side="left", pady=15)
+            # Exibe Nome e Cargo conforme Requisito RF017
+            nome_display = func[1] if isinstance(func, tuple) else func
+            ctk.CTkLabel(f, text=f"   {nome_display}", font=("Inter", 14, "bold"), text_color=COR_INPUT_TEXTO).pack(side="left", pady=15)
+            
             if self.controller.is_admin:
-                ctk.CTkButton(f, text="Demitir", fg_color=COR_PERIGO, width=80, height=30, command=lambda x=func: self.controller.demitir_funcionario(x)).pack(side="right", padx=10)
+                ctk.CTkButton(f, text="Demitir", fg_color=COR_PERIGO, width=80, height=30, 
+                              command=lambda x=func: self.controller.demitir_funcionario(x)).pack(side="right", padx=10)
+                ctk.CTkButton(f, text="Editar", fg_color=COR_NAVBAR, width=80, height=30, 
+                              command=lambda x=func: self.abrir_modal_funcionario(x)).pack(side="right", padx=5)
+
         ctk.CTkButton(self.content_area, text="Voltar", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR).pack(pady=20)
 
     def desenhar_tela_vendas(self):
