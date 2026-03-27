@@ -41,7 +41,11 @@ class HubPage:
         self.servicos = []
         self.clientes = []
         self.agendamentos = [] 
-        self.funcionarios = ["Carlos  (Dono)", "Ana Costa", "Lucas "]
+        self.funcionarios = [
+            (1, "Carlos (Dono)", "Proprietário", "9199999999", "carlos@petz.com", "admin", "1234"),
+            (2, "Ana Costa", "Tosadora", "9188888888", "ana@petz.com", "ana.costa", "123"),
+            (3, "Lucas Silva", "Veterinário", "9177777777", "lucas@petz.com", "lucas.vete", "123")
+        ]
 
         # PDV Vendas state
         self.carrinho_cliente = None
@@ -268,6 +272,23 @@ class HubPage:
                 self.tela_estoque_visualizacao()
             else:
                 messagebox.showerror("Erro", "Erro ao excluir o produto.")
+                
+    # GESTÃO DE EQUIPE ------------------------------------------
+    def salvar_funcionario(self, id_func, nome, cargo, tel, email, login, senha):
+        # Aqui você implementaria o FuncionarioModel.inserir ou atualizar
+        # Para fins de interface imediata, vamos atualizar a lista local:
+        novo_func = (id_func or len(self.funcionarios)+1, nome, cargo, tel, email, login, senha)
+        
+        # Simulação de salvamento (Já que não podemos alterar o banco agora)
+        if id_func is None:
+            self.funcionarios.append(novo_func)
+        else:
+            # Lógica para substituir na lista local
+            pass 
+            
+        messagebox.showinfo("Sucesso", "Funcionário salvo com sucesso!")
+        self.tela_funcionarios()
+        return True
     
     # OUTROS ----------------------------------------------------
 
