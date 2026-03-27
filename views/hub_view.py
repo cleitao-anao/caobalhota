@@ -716,7 +716,13 @@ class HubView(ctk.CTkFrame):
         container.pack(fill="both", expand=True, padx=30, pady=(0, 30))
 
         ent_nome = self.criar_input(container, "Nome Completo *")
-        ent_cargo = self.criar_input(container, "Cargo (ex: Veterinário, Tosador)")
+        
+        ctk.CTkLabel(container, text="Cargo *", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        cargos_lista = ["Dono", "Repositor", "Caixa", "Atendente", "Veterinario"]
+        combo_cargo = ctk.CTkOptionMenu(container, values=cargos_lista, fg_color="#F9F9F9", text_color=COR_INPUT_TEXTO, button_color=COR_NAVBAR, height=45)
+        combo_cargo.pack(fill="x", padx=10, pady=5)
+        combo_cargo.set("Atendente")
+        
         ent_tel = self.criar_input(container, "Telefone")
         ent_email = self.criar_input(container, "E-mail")
         ent_login = self.criar_input(container, "Login de Acesso")
@@ -726,7 +732,9 @@ class HubView(ctk.CTkFrame):
         if funcionario_dados:
             id_atual = funcionario_dados[0]
             ent_nome.insert(0, str(funcionario_dados[1]))
-            ent_cargo.insert(0, str(funcionario_dados[2]))
+            cargo_atual = str(funcionario_dados[2]) if len(funcionario_dados) > 2 else "Atendente"
+            if cargo_atual in cargos_lista:
+                combo_cargo.set(cargo_atual)
             # ... preencher os demais campos se necessário ...
 
         def salvar():
@@ -736,7 +744,7 @@ class HubView(ctk.CTkFrame):
             
             # Chama o método no controller (precisaremos criar esse método no hub_page.py)
             sucesso = self.controller.salvar_funcionario(
-                id_atual, ent_nome.get(), ent_cargo.get(), 
+                id_atual, ent_nome.get(), combo_cargo.get(), 
                 ent_tel.get(), ent_email.get(), ent_login.get(), ent_senha.get()
             )
             if sucesso:
@@ -850,7 +858,7 @@ class HubView(ctk.CTkFrame):
         
         ctk.CTkLabel(topo, text="👥 Nossa Equipe Petz", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left", padx=50)
         
-        if self.controller.is_admin:
+        if self.controller.tem_permissao('equipe_editar'):
             ctk.CTkButton(topo, text="+ Novo Funcionário", fg_color=COR_BOTAO_ACCENT, text_color="#000", 
                           command=self.abrir_modal_funcionario).pack(side="right", padx=50)
 
@@ -1029,18 +1037,22 @@ class HubView(ctk.CTkFrame):
         self.limpar_tela()
         
         topo_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
-        topo_frame.pack(fill="x", pady=(10, 20), padx=20)
+        topo_frame.pack(fill="x", pady=(10, 10), padx=20)
         ctk.CTkLabel(topo_frame, text="📅 Agenda de Atendimentos", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left")
         
         if self.controller.tem_permissao('agenda_editar'):
             ctk.CTkButton(topo_frame, text="+ Novo Agendamento", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), width=200, height=40, corner_radius=10, 
                           command=lambda: self.abrir_modal_agendamento()).pack(side="right")
 
-        scroll = ctk.CTkScrollableFrame(self.content_area, width=1050, height=480, fg_color="transparent")
+        # Barra de pesquisa
+        busca_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        busca_frame.pack(fill="x", padx=20, pady=(0, 10))
+        ctk.CTkLabel(busca_frame, text="🔍", font=("Inter", 16)).pack(side="left", padx=(0, 5))
+        busca_ent = ctk.CTkEntry(busca_frame, placeholder_text="Pesquisar por cliente, pet ou serviço...", fg_color="#F9F9F9", border_color=COR_BORDA, text_color=COR_INPUT_TEXTO, height=40, width=400)
+        busca_ent.pack(side="left", fill="x", expand=True)
+
+        scroll = ctk.CTkScrollableFrame(self.content_area, width=1050, height=440, fg_color="transparent")
         scroll.pack(fill="both", expand=True, padx=20)
-        
-        if not self.controller.agendamentos:
-            ctk.CTkLabel(scroll, text="Nenhum agendamento encontrado.", text_color="gray", font=("Inter", 16)).pack(pady=50)
         
         status_cores = {
             'agendado': ('#3498db', '🗓️'),
@@ -1049,62 +1061,99 @@ class HubView(ctk.CTkFrame):
             'pago': ('#27ae60', '💵'),
             'cancelado': ('#e74c3c', '❌'),
         }
-        
-        for a in self.controller.agendamentos:
-            # a: (0:id, 1:cliente, 2:pet, 3:servico, 4:funcionario, 5:data, 6:hora, 7:status, 8:cor_tintura, 9:observacoes, 10:valor, 11-14:ids)
-            a_id = a[0]
-            a_cliente = a[1]
-            a_pet = a[2]
-            a_servico = a[3]
-            a_func = a[4]
-            a_data = a[5].strftime("%d/%m/%Y") if hasattr(a[5], 'strftime') else str(a[5])
-            a_hora = str(a[6])
-            if hasattr(a[6], 'total_seconds'):
-                total_s = int(a[6].total_seconds())
-                a_hora = f"{total_s // 3600:02d}:{(total_s % 3600) // 60:02d}"
-            a_status = a[7]
-            a_cor = a[8] or ''
-            a_obs = a[9] or ''
-            a_valor = a[10]
+
+        # Status anterior para reverter (Dono)
+        status_anterior = {
+            'cancelado': 'agendado',
+            'pago': 'concluído',
+            'concluído': 'iniciado',
+            'iniciado': 'agendado',
+        }
+
+        is_dono = self.controller.funcionario_logado.get('cargo', '') == 'Dono'
+
+        def renderizar_lista(filtro=""):
+            for w in scroll.winfo_children(): w.destroy()
             
-            cor_status, ico = status_cores.get(a_status, ('#888', '❓'))
+            filtro_lower = filtro.lower().strip()
+            encontrou = False
             
-            f = ctk.CTkFrame(scroll, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
-            f.pack(fill="x", pady=6, padx=5)
-            
-            # Lado esquerdo: info
-            info = ctk.CTkFrame(f, fg_color="transparent")
-            info.pack(side="left", padx=20, pady=12, fill="y")
-            
-            ctk.CTkLabel(info, text=f"🐾 {a_pet}", font=("Inter", 16, "bold"), text_color=COR_NAVBAR).pack(anchor="w")
-            ctk.CTkLabel(info, text=f"Dono: {a_cliente}  |  Serviço: {a_servico}  |  R$ {a_valor:.2f}", font=("Inter", 12), text_color=COR_TEXTO_PADRAO).pack(anchor="w")
-            ctk.CTkLabel(info, text=f"📆 {a_data} às {a_hora}  |  Resp: {a_func}", font=("Inter", 11), text_color="gray").pack(anchor="w")
-            if a_cor:
-                ctk.CTkLabel(info, text=f"🎨 Tintura: {a_cor}", font=("Inter", 11), text_color="#6f42c1").pack(anchor="w")
-            if a_obs:
-                ctk.CTkLabel(info, text=f"📝 {a_obs[:50]}", font=("Inter", 11), text_color="gray").pack(anchor="w")
-            
-            # Lado direito: status + ações
-            right = ctk.CTkFrame(f, fg_color="transparent")
-            right.pack(side="right", padx=15, pady=10)
-            
-            ctk.CTkLabel(right, text=f"{ico} {a_status.upper()}", font=("Inter", 13, "bold"), text_color=cor_status).pack(pady=(0, 5))
-            
-            if self.controller.tem_permissao('agenda_editar') and a_status not in ('pago', 'cancelado'):
+            for a in self.controller.agendamentos:
+                a_id = a[0]
+                a_cliente = a[1]
+                a_pet = a[2]
+                a_servico = a[3]
+                a_func = a[4]
+                a_data = a[5].strftime("%d/%m/%Y") if hasattr(a[5], 'strftime') else str(a[5])
+                a_hora = str(a[6])
+                if hasattr(a[6], 'total_seconds'):
+                    total_s = int(a[6].total_seconds())
+                    a_hora = f"{total_s // 3600:02d}:{(total_s % 3600) // 60:02d}"
+                a_status = a[7]
+                a_cor = a[8] or ''
+                a_obs = a[9] or ''
+                a_valor = a[10]
+                
+                # Filtrar por nome do cliente, pet ou serviço
+                if filtro_lower and filtro_lower not in a_cliente.lower() and filtro_lower not in a_pet.lower() and filtro_lower not in a_servico.lower():
+                    continue
+                
+                encontrou = True
+                cor_status, ico = status_cores.get(a_status, ('#888', '❓'))
+                
+                f = ctk.CTkFrame(scroll, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+                f.pack(fill="x", pady=6, padx=5)
+                
+                info = ctk.CTkFrame(f, fg_color="transparent")
+                info.pack(side="left", padx=20, pady=12, fill="y")
+                
+                ctk.CTkLabel(info, text=f"🐾 {a_pet}", font=("Inter", 16, "bold"), text_color=COR_NAVBAR).pack(anchor="w")
+                ctk.CTkLabel(info, text=f"Dono: {a_cliente}  |  Serviço: {a_servico}  |  R$ {a_valor:.2f}", font=("Inter", 12), text_color=COR_TEXTO_PADRAO).pack(anchor="w")
+                ctk.CTkLabel(info, text=f"📆 {a_data} às {a_hora}  |  Resp: {a_func}", font=("Inter", 11), text_color="gray").pack(anchor="w")
+                if a_cor:
+                    ctk.CTkLabel(info, text=f"🎨 Tintura: {a_cor}", font=("Inter", 11), text_color="#6f42c1").pack(anchor="w")
+                if a_obs:
+                    ctk.CTkLabel(info, text=f"📝 {a_obs[:50]}", font=("Inter", 11), text_color="gray").pack(anchor="w")
+                
+                right = ctk.CTkFrame(f, fg_color="transparent")
+                right.pack(side="right", padx=15, pady=10)
+                
+                ctk.CTkLabel(right, text=f"{ico} {a_status.upper()}", font=("Inter", 13, "bold"), text_color=cor_status).pack(pady=(0, 5))
+                
                 btn_frame = ctk.CTkFrame(right, fg_color="transparent")
                 btn_frame.pack()
                 
-                proximos = {
-                    'agendado': [('Iniciar', 'iniciado', '#f39c12'), ('Cancelar', 'cancelado', COR_PERIGO)],
-                    'iniciado': [('Concluir', 'concluído', COR_SUCESSO), ('Cancelar', 'cancelado', COR_PERIGO)],
-                    'concluído': [('Marcar Pago', 'pago', '#27ae60')],
-                }
+                # Botões de avançar status (para quem tem permissão e status não finalizado)
+                if self.controller.tem_permissao('agenda_editar') and a_status not in ('pago', 'cancelado'):
+                    proximos = {
+                        'agendado': [('Iniciar', 'iniciado', '#f39c12'), ('Cancelar', 'cancelado', COR_PERIGO)],
+                        'iniciado': [('Concluir', 'concluído', COR_SUCESSO), ('Cancelar', 'cancelado', COR_PERIGO)],
+                        'concluído': [],
+                    }
+                    if is_dono:
+                        proximos['concluído'].append(('Marcar Pago', 'pago', '#27ae60'))
+                    for txt, status_novo, cor in proximos.get(a_status, []):
+                        ctk.CTkButton(btn_frame, text=txt, width=80, height=25, fg_color=cor, font=("Inter", 10, "bold"),
+                                      command=lambda aid=a_id, st=status_novo: self.controller.atualizar_status_agendamento(aid, st)).pack(side="left", padx=2)
                 
-                for txt, status_novo, cor in proximos.get(a_status, []):
-                    ctk.CTkButton(btn_frame, text=txt, width=80, height=25, fg_color=cor, font=("Inter", 10, "bold"),
-                                  command=lambda aid=a_id, st=status_novo: self.controller.atualizar_status_agendamento(aid, st)).pack(side="left", padx=2)
+                # Botão de reverter (somente Dono) para cancelado/pago
+                if is_dono and a_status in ('cancelado', 'pago'):
+                    anterior = status_anterior.get(a_status, 'agendado')
+                    ctk.CTkButton(btn_frame, text=f"↩ Reverter → {anterior}", width=130, height=25, 
+                                  fg_color="#6c757d", font=("Inter", 10, "bold"),
+                                  command=lambda aid=a_id, st=anterior: self.controller.atualizar_status_agendamento(aid, st)).pack(side="left", padx=2)
+            
+            if not encontrou:
+                ctk.CTkLabel(scroll, text="Nenhum agendamento encontrado.", text_color="gray", font=("Inter", 16)).pack(pady=50)
 
-        ctk.CTkButton(self.content_area, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=15)
+        # Evento de pesquisa
+        def ao_pesquisar(event=None):
+            renderizar_lista(busca_ent.get())
+        
+        busca_ent.bind("<KeyRelease>", ao_pesquisar)
+        renderizar_lista()
+
+        ctk.CTkButton(self.content_area, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=10)
 
     # ================= REGISTRO DE VENDA (PDV) =====================
     def desenhar_tela_registro_venda(self):
