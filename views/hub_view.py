@@ -24,7 +24,7 @@ COR_BOTAO_VOLTAR    = "#333333"
 COR_SUCESSO         = "#28A745"
 COR_PERIGO          = "#DC3545"
 
-SENHA_ADMIN         = "1234" 
+
 
 class HubView(ctk.CTkFrame):
     def __init__(self, master, controller, **kwargs):
@@ -44,32 +44,36 @@ class HubView(ctk.CTkFrame):
 
         ctk.CTkLabel(self.navbar, text="CÃOBALHOTA", font=("Inter", 24, "bold"), text_color=COR_TEXTO_NAV).pack(side="left")
 
-        self.btn_admin = ctk.CTkButton(self.navbar, text="🔓 Admin", width=100, height=35, 
-                                       fg_color="transparent", border_width=1, border_color=COR_TEXTO_NAV,
-                                       hover_color=COR_BOTAO_HOVER, command=self.controller.solicitar_senha_admin)
-        self.btn_admin.pack(side="right", padx=30)
+        # Badge do cargo do funcionário logado
+        user_frame = ctk.CTkFrame(self.navbar, fg_color="transparent")
+        user_frame.pack(side="right", padx=15)
+        
+        cargo_func = self.controller.funcionario_logado.get('cargo', '')
+        nome_func = self.controller.funcionario_logado.get('nome', '')
+        
+        ctk.CTkLabel(user_frame, text=f"👤 {nome_func}", font=("Inter", 13, "bold"), text_color=COR_TEXTO_NAV).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(user_frame, text=f"[{cargo_func}]", font=("Inter", 11), text_color=COR_BOTAO_ACCENT).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkButton(user_frame, text="🚪 Sair", width=70, height=30, 
+                      fg_color="transparent", border_width=1, border_color=COR_TEXTO_NAV,
+                      hover_color=COR_PERIGO, text_color=COR_TEXTO_NAV, font=("Inter", 11),
+                      command=self.controller.sair_trocar_usuario).pack(side="left")
 
         self.nav_btns = ctk.CTkFrame(self.navbar, fg_color="transparent")
         self.nav_btns.pack(side="right", padx=10)
 
         opts = {"fg_color": "transparent", "text_color": COR_TEXTO_NAV, "hover_color": COR_BOTAO_HOVER, "corner_radius": 20, "width": 110, "font": ("Inter", 13, "bold")}
-        ctk.CTkButton(self.nav_btns, text="Dashboard", command=self.controller.mostrar_controle, **opts).pack(side="left", padx=5)
+        
+        # Todos os botões visíveis para todos (permissões só controlam ações)
+        ctk.CTkButton(self.nav_btns, text="Início", command=self.controller.mostrar_controle, **opts).pack(side="left", padx=5)
         ctk.CTkButton(self.nav_btns, text="Cadastrar", command=self.controller.abrir_modal_cadastro, **opts).pack(side="left", padx=5)
-        ctk.CTkButton(self.nav_btns, text="🛒 Loja / Serviços", command=self.controller.tela_registros, **opts).pack(side="left", padx=5)
+        ctk.CTkButton(self.nav_btns, text="🛝️ Loja / Serviços", command=self.controller.tela_registros, **opts).pack(side="left", padx=5)
         ctk.CTkButton(self.nav_btns, text="💰 Caixa PDV", command=self.controller.tela_registro_venda, fg_color=COR_SUCESSO, text_color="#FFF", hover_color="#218838", corner_radius=20, width=110, font=("Inter", 13, "bold")).pack(side="left", padx=5)
 
         self.content_area = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.content_area.pack(fill="both", expand=True, padx=30, pady=20)
 
-    def set_admin_button_state(self, is_admin):
-        if is_admin:
-            self.btn_admin.configure(text="🔒 Ativo", fg_color=COR_BOTAO_ACCENT, text_color="#000")
-        else:
-            self.btn_admin.configure(text="🔓 Admin", fg_color="transparent")
 
-    def pedir_senha_admin(self):
-        dialog = ctk.CTkInputDialog(text="Senha Admin:", title="Acesso")
-        return dialog.get_input()
 
     def limpar_tela(self):
         for widget in self.content_area.winfo_children(): widget.destroy()
@@ -83,15 +87,27 @@ class HubView(ctk.CTkFrame):
         grid = ctk.CTkFrame(self.content_area, fg_color="transparent")
         grid.pack(expand=True, fill="both")
         
-        menu = [("AGENDA", "📅", self.controller.tela_agenda), ("CLIENTES", "👥", self.controller.tela_cadastro), ("ESTOQUE", "📦", self.controller.tela_estoque_visualizacao), ("EQUIPE", "👥", self.controller.tela_funcionarios), ("RELATÓRIOS", "📊", self.controller.tela_vendas)]
+        # Todos os cards visíveis para todos
+        menu = [
+            ("AGENDA", "📅", self.controller.tela_agenda),
+            ("CLIENTES", "👥", self.controller.tela_cadastro),
+            ("ESTOQUE", "📦", self.controller.tela_estoque_visualizacao),
+            ("SERVIÇOS", "✂️", self.controller.tela_servicos),
+            ("EQUIPE", "👥", self.controller.tela_funcionarios),
+            ("RELATÓRIOS", "📊", self.controller.tela_vendas),
+        ]
         
+        cols = 3
         for i, (t, icon, cmd) in enumerate(menu):
+            row = i // cols
+            col = i % cols
             f = ctk.CTkFrame(grid, fg_color=COR_CARD, corner_radius=20, border_width=1, border_color=COR_BORDA)
-            f.grid(row=0, column=i, padx=15, sticky="nsew")
-            grid.columnconfigure(i, weight=1)
-            ctk.CTkLabel(f, text=icon, font=("Inter", 50)).pack(pady=(40, 10))
+            f.grid(row=row, column=col, padx=15, pady=10, sticky="nsew")
+            grid.columnconfigure(col, weight=1)
+            grid.rowconfigure(row, weight=1)
+            ctk.CTkLabel(f, text=icon, font=("Inter", 50)).pack(pady=(30, 8))
             ctk.CTkLabel(f, text=t, font=("Inter", 16, "bold"), text_color=COR_TEXTO_TITULO).pack()
-            ctk.CTkButton(f, text="Acessar", command=cmd, fg_color=COR_NAVBAR, corner_radius=15, width=120).pack(pady=30)
+            ctk.CTkButton(f, text="Acessar", command=cmd, fg_color=COR_NAVBAR, corner_radius=15, width=120).pack(pady=20)
 
     def criar_input(self, master, placeholder):
         ent = ctk.CTkEntry(master, placeholder_text=placeholder, fg_color="#F9F9F9", border_color=COR_BORDA, text_color=COR_INPUT_TEXTO, height=45)
@@ -104,7 +120,8 @@ class HubView(ctk.CTkFrame):
         header_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
         header_frame.pack(fill="x", pady=(10, 20))
         ctk.CTkLabel(header_frame, text="👥 Gestão de Clientes & Pets", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left", padx=20)
-        ctk.CTkButton(header_frame, text="+ Novo Cliente", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), width=180, height=40, corner_radius=10, command=self.controller.abrir_modal_cadastro).pack(side="right", padx=20)
+        if self.controller.tem_permissao('cadastrar'):
+            ctk.CTkButton(header_frame, text="+ Novo Cliente", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), width=180, height=40, corner_radius=10, command=self.controller.abrir_modal_cadastro).pack(side="right", padx=20)
         scroll = ctk.CTkScrollableFrame(self.content_area, width=1000, height=500, fg_color=COR_CARD, border_width=1, border_color=COR_BORDA, corner_radius=15)
         scroll.pack(padx=20, fill="both", expand=True)
         if not self.controller.clientes:
@@ -141,8 +158,9 @@ class HubView(ctk.CTkFrame):
             btn_area = ctk.CTkFrame(f, fg_color="transparent")
             btn_area.pack(side="right", padx=15)
             ctk.CTkButton(btn_area, text="🐾 Pets", width=65, height=30, fg_color=COR_ACCENT, text_color="#000", font=("Inter", 11, "bold"), command=lambda c=cliente: self.controller.tela_pets_cliente(c)).pack(side="left", padx=5)
-            ctk.CTkButton(btn_area, text="Editar", width=65, height=30, fg_color=COR_NAVBAR, command=lambda c=cliente: self.editar_cliente_modal(c)).pack(side="left", padx=5)
-            ctk.CTkButton(btn_area, text="Excluir", width=65, height=30, fg_color=COR_PERIGO, command=lambda id_c=c_id: self.controller.excluir_cliente_logica(id_c)).pack(side="left", padx=5)
+            if self.controller.tem_permissao('clientes_editar'):
+                ctk.CTkButton(btn_area, text="Editar", width=65, height=30, fg_color=COR_NAVBAR, command=lambda c=cliente: self.editar_cliente_modal(c)).pack(side="left", padx=5)
+                ctk.CTkButton(btn_area, text="Excluir", width=65, height=30, fg_color=COR_PERIGO, command=lambda id_c=c_id: self.controller.excluir_cliente_logica(id_c)).pack(side="left", padx=5)
         ctk.CTkButton(self.content_area, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=20)
 
     def desenhar_tela_pets_cliente(self, cliente):
@@ -371,7 +389,7 @@ class HubView(ctk.CTkFrame):
             if hasattr(self.controller, "current_screen") and self.controller.current_screen == "cadastro": self.controller.tela_cadastro()
             if item_para_venda: 
                 if tipo_venda == "servico":
-                    self.abrir_modal_data_hora(item_para_venda, cliente_mock)
+                    self.abrir_modal_agendamento()
                 else:
                     self.controller.finalizar_venda_logica(item_para_venda, tipo_venda, cliente=cliente_mock)
         
@@ -403,13 +421,18 @@ class HubView(ctk.CTkFrame):
         ctk.CTkLabel(scroll, text="✂️ Centro de Estética & Saúde (Obrigatório Cadastro)", font=("Inter", 22, "bold"), text_color=COR_TEXTO_TITULO).pack(pady=(30, 15), anchor="w")
         gs = ctk.CTkFrame(scroll, fg_color="transparent")
         gs.pack(fill="x")
-        for i, s in enumerate(self.controller.vendas_servicos.keys()):
-            card = ctk.CTkFrame(gs, fg_color=COR_NAVBAR, corner_radius=12, width=180, height=100)
+        for i, s_row in enumerate(self.controller.servicos):
+            # s_row: (id, nome, valor_base, descricao)
+            s_id = s_row[0]
+            s_nome = s_row[1]
+            s_valor = s_row[2]
+            card = ctk.CTkFrame(gs, fg_color=COR_NAVBAR, corner_radius=12, width=180, height=120)
             card.grid(row=i//5, column=i%5, padx=8, pady=8)
             card.grid_propagate(False)
-            ctk.CTkLabel(card, text=s, font=("Inter", 13, "bold"), text_color=COR_TEXTO_NAV).pack(expand=True)
+            ctk.CTkLabel(card, text=s_nome, font=("Inter", 13, "bold"), text_color=COR_TEXTO_NAV).pack(pady=(15, 0))
+            ctk.CTkLabel(card, text=f"R$ {s_valor:.2f}", font=("Inter", 11), text_color=COR_BOTAO_ACCENT).pack()
             ctk.CTkButton(card, text="Agendar", fg_color=COR_BOTAO_ACCENT, text_color="#000", height=25, width=120, font=("Inter", 11, "bold"),
-                          command=lambda x=s: self.fluxo_venda(x, "servico")).pack(pady=(0, 15))
+                          command=lambda sid=s_id, sn=s_nome: self.abrir_modal_agendamento(servico_pre=(sid, sn))).pack(pady=(8, 10))
 
     def fluxo_venda(self, item, tipo):
         pop = ctk.CTkToplevel(self)
@@ -448,7 +471,7 @@ class HubView(ctk.CTkFrame):
                     
                     ctk.CTkLabel(f_res, text=f"{c_nome} ({pets_str})", text_color=COR_TEXTO_TITULO, font=("Inter", 12)).pack(side="left", padx=10)
                     ctk.CTkButton(f_res, text="Selecionar", width=80, height=24, fg_color=COR_SUCESSO, 
-                                  command=lambda cl=c_dict: [pop.destroy(), self.abrir_modal_data_hora(item, cl) if tipo == "servico" else self.controller.finalizar_venda_logica(item, tipo, cl)]).pack(side="right", padx=5)
+                                  command=lambda cl=c_dict: [pop.destroy(), self.abrir_modal_agendamento() if tipo == "servico" else self.controller.finalizar_venda_logica(item, tipo, cl)]).pack(side="right", padx=5)
 
         busca_ent.bind("<KeyRelease>", atualizar_busca)
         atualizar_busca()
@@ -459,34 +482,115 @@ class HubView(ctk.CTkFrame):
         ctk.CTkButton(pop, text="Visitante (Sem Agenda)", fg_color="transparent", border_width=1, border_color="#777", text_color=COR_TEXTO_TITULO, state=estado_visitante,
                       command=lambda: [self.controller.finalizar_venda_logica(item, tipo), pop.destroy()]).pack(pady=5)
 
-    def abrir_modal_data_hora(self, servico, cliente):
-        modal_dt = ctk.CTkToplevel(self)
-        modal_dt.geometry("400x450")
-        modal_dt.title("Escolher Data e Hora")
-        modal_dt.attributes("-topmost", True)
-        modal_dt.grab_set()
+    def abrir_modal_agendamento(self, servico_pre=None):
+        """Formulário completo de agendamento"""
+        from model.agendamento import AgendamentoModel
+        from model.pet import PetModel
+        
+        modal = ctk.CTkToplevel(self)
+        modal.geometry("550x750")
+        modal.title("Novo Agendamento")
+        modal.configure(fg_color=COR_FUNDO_EXTERNO)
+        modal.attributes("-topmost", True)
+        modal.grab_set()
 
-        ctk.CTkLabel(modal_dt, text=f"Agendar {servico}", font=("Inter", 18, "bold"), text_color=COR_NAVBAR).pack(pady=15)
-        pets_str = ", ".join(p.get("nome", "") for p in cliente.get("pets", [])) if "pets" in cliente else cliente.get("pet", "")
-        ctk.CTkLabel(modal_dt, text=f"Cliente: {cliente.get('humano', '')} & {pets_str}", font=("Inter", 12)).pack()
+        ctk.CTkLabel(modal, text="📅 Novo Agendamento", font=("Inter", 22, "bold"), text_color=COR_NAVBAR).pack(pady=15)
 
-        ctk.CTkLabel(modal_dt, text="Selecione a Data:", font=("Inter", 12, "bold")).pack(pady=(20, 5))
-        cal = DateEntry(modal_dt, width=12, background=COR_NAVBAR, foreground='white', borderwidth=2, locale='pt_BR')
-        cal.pack(pady=5)
+        scroll = ctk.CTkScrollableFrame(modal, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        scroll.pack(fill="both", expand=True, padx=20, pady=(0, 10))
 
-        ctk.CTkLabel(modal_dt, text="Selecione o Horário:", font=("Inter", 12, "bold")).pack(pady=(20, 5))
+        # --- 1. Cliente ---
+        ctk.CTkLabel(scroll, text="Cliente *", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        self.controller.carregar_clientes()
+        clientes_db = self.controller.clientes
+        c_map = {f"{c[1]} (ID:{c[0]})": c[0] for c in clientes_db}
+        combo_cliente = ctk.CTkOptionMenu(scroll, values=list(c_map.keys()) if c_map else ["Nenhum cliente"], fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        combo_cliente.pack(fill="x", padx=10, pady=5)
+
+        # --- 2. Pet (atualiza ao trocar cliente) ---
+        ctk.CTkLabel(scroll, text="Pet *", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        combo_pet = ctk.CTkOptionMenu(scroll, values=["Selecione um cliente primeiro"], fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        combo_pet.pack(fill="x", padx=10, pady=5)
+        
+        p_map = {}
+        def atualizar_pets(escolha):
+            nonlocal p_map
+            id_cli = c_map.get(escolha)
+            if id_cli:
+                pets_db = PetModel.listar_por_cliente(id_cli)
+                p_map = {f"{p[2]} (ID:{p[0]})": p[0] for p in pets_db}
+                if p_map:
+                    combo_pet.configure(values=list(p_map.keys()))
+                    combo_pet.set(list(p_map.keys())[0])
+                else:
+                    combo_pet.configure(values=["Nenhum pet cadastrado"])
+                    combo_pet.set("Nenhum pet cadastrado")
+        
+        combo_cliente.configure(command=atualizar_pets)
+        if c_map:
+            atualizar_pets(list(c_map.keys())[0])
+
+        # --- 3. Serviço ---
+        ctk.CTkLabel(scroll, text="Serviço *", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        self.controller.carregar_servicos()
+        servicos_db = self.controller.servicos
+        s_map = {f"{s[1]} - R${s[2]:.2f}": s[0] for s in servicos_db}
+        combo_servico = ctk.CTkOptionMenu(scroll, values=list(s_map.keys()) if s_map else ["Nenhum serviço"], fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        combo_servico.pack(fill="x", padx=10, pady=5)
+        
+        if servico_pre:
+            pre_key = [k for k, v in s_map.items() if v == servico_pre[0]]
+            if pre_key:
+                combo_servico.set(pre_key[0])
+
+        # --- 4. Funcionário ---
+        ctk.CTkLabel(scroll, text="Funcionário Responsável *", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        funcs_db = AgendamentoModel.listar_funcionarios()
+        f_map = {f"{f[1]} ({f[2]})": f[0] for f in funcs_db}
+        combo_func = ctk.CTkOptionMenu(scroll, values=list(f_map.keys()) if f_map else ["Nenhum funcionário"], fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        combo_func.pack(fill="x", padx=10, pady=5)
+
+        # --- 5. Data ---
+        ctk.CTkLabel(scroll, text="Data *", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        cal = DateEntry(scroll, width=20, background=COR_NAVBAR, foreground='white', borderwidth=2, locale='pt_BR')
+        cal.pack(fill="x", padx=10, pady=5)
+
+        # --- 6. Horário ---
+        ctk.CTkLabel(scroll, text="Horário *", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
         horarios = [f"{h:02d}:00" for h in range(8, 19)] + [f"{h:02d}:30" for h in range(8, 19)]
         horarios.sort()
-        combo_hora = ctk.CTkOptionMenu(modal_dt, values=horarios, fg_color=COR_CARD, text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
-        combo_hora.pack(pady=5)
+        combo_hora = ctk.CTkOptionMenu(scroll, values=horarios, fg_color="#F0F0F0", text_color=COR_TEXTO_TITULO, button_color=COR_NAVBAR)
+        combo_hora.pack(fill="x", padx=10, pady=5)
+
+        # --- 7. Cor Tintura (opcional) ---
+        ctk.CTkLabel(scroll, text="Cor da Tintura (opcional)", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        ent_cor = self.criar_input(scroll, "Ex: Azul, Rosa...")
+
+        # --- 8. Observações (opcional) ---
+        ctk.CTkLabel(scroll, text="Observações (opcional)", font=("Inter", 13, "bold"), text_color=COR_TEXTO_TITULO).pack(anchor="w", padx=10, pady=(10, 0))
+        ent_obs = self.criar_input(scroll, "Cuidados especiais, alergias...")
 
         def confirmar():
-            data_str = cal.get_date().strftime("%d/%m/%Y")
-            hora_str = combo_hora.get()
-            self.controller.finalizar_venda_logica(servico, "servico", cliente, f"{data_str} às {hora_str}")
-            modal_dt.destroy()
+            id_cli = c_map.get(combo_cliente.get())
+            id_pet = p_map.get(combo_pet.get())
+            id_serv = s_map.get(combo_servico.get())
+            id_func = f_map.get(combo_func.get())
+            
+            if not all([id_cli, id_pet, id_serv, id_func]):
+                messagebox.showwarning("Atenção", "Preencha todos os campos obrigatórios (Cliente, Pet, Serviço, Funcionário).")
+                return
+            
+            data_sel = cal.get_date().strftime("%Y-%m-%d")
+            hora_sel = combo_hora.get() + ":00"
+            cor = ent_cor.get().strip()
+            obs = ent_obs.get().strip()
+            
+            sucesso = self.controller.criar_agendamento(id_cli, id_pet, id_serv, id_func, data_sel, hora_sel, cor, obs)
+            if sucesso:
+                modal.destroy()
 
-        ctk.CTkButton(modal_dt, text="Confirmar Agendamento", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), command=confirmar, height=45).pack(pady=30)
+        ctk.CTkButton(modal, text="✅ Confirmar Agendamento", fg_color=COR_SUCESSO, text_color="#FFF", font=("Inter", 14, "bold"), height=50, command=confirmar).pack(fill="x", padx=20, pady=(5, 15))
+
 
     def desenhar_tela_estoque_visualizacao(self):
         self.limpar_tela()
@@ -496,7 +600,7 @@ class HubView(ctk.CTkFrame):
 
         ctk.CTkLabel(topo_frame, text="📦 Inventário de Produtos", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left")
         
-        if self.controller.is_admin:
+        if self.controller.tem_permissao('estoque_editar'):
             ctk.CTkButton(topo_frame, text="+ Novo Produto", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 14, "bold"), 
                           command=lambda: self.abrir_modal_produto()).pack(side="right")
 
@@ -511,7 +615,7 @@ class HubView(ctk.CTkFrame):
         ctk.CTkLabel(h_frame, text="Nome", width=180, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
         ctk.CTkLabel(h_frame, text="Preço", width=80, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
         ctk.CTkLabel(h_frame, text="Estoque", width=80, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
-        if self.controller.is_admin:
+        if self.controller.tem_permissao('estoque_editar'):
             ctk.CTkLabel(h_frame, text="Ações", width=120, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="center").pack(side="right", padx=10)
 
         for p_row in self.controller.produtos:
@@ -533,7 +637,7 @@ class HubView(ctk.CTkFrame):
             cor_q = COR_SUCESSO if p_estoque > 10 else COR_PERIGO
             ctk.CTkLabel(f, text=f"{p_estoque} un.", text_color=cor_q, font=("Inter", 13, "bold"), width=80, anchor="w").pack(side="left", padx=10)
             
-            if self.controller.is_admin:
+            if self.controller.tem_permissao('estoque_editar'):
                 acoes_frame = ctk.CTkFrame(f, fg_color="transparent", width=120)
                 acoes_frame.pack(side="right", padx=10)
                 
@@ -597,6 +701,104 @@ class HubView(ctk.CTkFrame):
 
         ctk.CTkButton(modal, text="Salvar Produto", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), height=45, command=salvar).pack(pady=(0, 20))
 
+    # ================= GESTÃO DE SERVIÇOS =====================
+    def desenhar_tela_servicos(self):
+        self.limpar_tela()
+        
+        topo_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        topo_frame.pack(fill="x", pady=20, padx=50)
+
+        ctk.CTkLabel(topo_frame, text="✂️ Gestão de Serviços", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left")
+        
+        if self.controller.tem_permissao('servicos_editar'):
+            ctk.CTkButton(topo_frame, text="+ Novo Serviço", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 14, "bold"), 
+                          command=lambda: self.abrir_modal_servico()).pack(side="right")
+
+        scroll = ctk.CTkScrollableFrame(self.content_area, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA, height=450)
+        scroll.pack(fill="x", padx=50)
+        
+        # Cabeçalho da tabela
+        h_frame = ctk.CTkFrame(scroll, fg_color=COR_NAVBAR, corner_radius=8, height=40)
+        h_frame.pack(fill="x", pady=(0, 10), padx=5)
+        h_frame.pack_propagate(False)
+        ctk.CTkLabel(h_frame, text="ID", width=50, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        ctk.CTkLabel(h_frame, text="Nome", width=200, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        ctk.CTkLabel(h_frame, text="Valor Base", width=100, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        ctk.CTkLabel(h_frame, text="Descrição", width=200, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="w").pack(side="left", padx=10)
+        if self.controller.tem_permissao('servicos_editar'):
+            ctk.CTkLabel(h_frame, text="Ações", width=120, text_color=COR_TEXTO_NAV, font=("Inter", 13, "bold"), anchor="center").pack(side="right", padx=10)
+
+        if not self.controller.servicos:
+            ctk.CTkLabel(scroll, text="Nenhum serviço cadastrado ainda.", text_color="gray", font=("Inter", 14)).pack(pady=30)
+
+        for s_row in self.controller.servicos:
+            # s_row: (0:id, 1:nome, 2:valor_base, 3:descricao)
+            s_id = s_row[0]
+            s_nome = str(s_row[1])
+            s_valor = f"R$ {s_row[2]:.2f}"
+            s_desc = str(s_row[3] or "—")
+
+            f = ctk.CTkFrame(scroll, fg_color="transparent", border_width=0, height=40)
+            f.pack(fill="x", pady=2, padx=5)
+            f.pack_propagate(False)
+            
+            ctk.CTkLabel(f, text=str(s_id), width=50, anchor="w", font=("Inter", 13), text_color=COR_INPUT_TEXTO).pack(side="left", padx=10)
+            ctk.CTkLabel(f, text=s_nome, width=200, anchor="w", font=("Inter", 13), text_color=COR_INPUT_TEXTO).pack(side="left", padx=10)
+            ctk.CTkLabel(f, text=s_valor, width=100, anchor="w", font=("Inter", 13, "bold"), text_color=COR_SUCESSO).pack(side="left", padx=10)
+            ctk.CTkLabel(f, text=s_desc[:40], width=200, anchor="w", font=("Inter", 12), text_color=COR_TEXTO_PADRAO).pack(side="left", padx=10)
+            
+            if self.controller.tem_permissao('servicos_editar'):
+                acoes_frame = ctk.CTkFrame(f, fg_color="transparent", width=120)
+                acoes_frame.pack(side="right", padx=10)
+                
+                ctk.CTkButton(acoes_frame, text="Deletar", width=55, height=30, fg_color=COR_PERIGO, 
+                              command=lambda id_s=s_id: self.controller.excluir_servico(id_s)).pack(side="right", padx=2)
+                ctk.CTkButton(acoes_frame, text="Editar", width=55, height=30, fg_color=COR_NAVBAR, 
+                              command=lambda s=s_row: self.abrir_modal_servico(s)).pack(side="right", padx=2)
+
+        ctk.CTkButton(self.content_area, text="Voltar", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, corner_radius=20).pack(pady=25)
+
+    def abrir_modal_servico(self, servico_dados=None):
+        # servico_dados = (id, nome, valor_base, descricao)
+        if not self.controller.tem_permissao('servicos_editar'):
+            messagebox.showwarning("Acesso Negado", "Somente o Dono pode gerenciar serviços.")
+            return
+            
+        modal = ctk.CTkToplevel(self)
+        modal.geometry("500x500")
+        titulo = "Novo Serviço" if not servico_dados else f"Editar: {servico_dados[1]}"
+        modal.title(titulo)
+        modal.configure(fg_color=COR_FUNDO_EXTERNO)
+        modal.attributes("-topmost", True)
+        modal.grab_set()
+
+        ctk.CTkLabel(modal, text=f"✂️ {titulo}", font=("Inter", 20, "bold"), text_color=COR_NAVBAR).pack(pady=20)
+        
+        container = ctk.CTkFrame(modal, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
+        container.pack(fill="both", expand=True, padx=30, pady=(0, 30))
+
+        ent_nome = self.criar_input(container, "Nome do Serviço *")
+        ent_valor = self.criar_input(container, "Valor Base (R$) *")
+        ent_descricao = self.criar_input(container, "Descrição")
+
+        id_atual = None
+        if servico_dados:
+            id_atual = servico_dados[0]
+            ent_nome.insert(0, str(servico_dados[1]))
+            ent_valor.insert(0, str(servico_dados[2]))
+            ent_descricao.insert(0, str(servico_dados[3] or ""))
+
+        def salvar():
+            nom = ent_nome.get()
+            val = ent_valor.get()
+            des = ent_descricao.get()
+            
+            sucesso = self.controller.salvar_servico(id_atual, nom, val, des)
+            if sucesso:
+                modal.destroy()
+
+        ctk.CTkButton(modal, text="Salvar Serviço", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), height=45, command=salvar).pack(pady=(0, 20))
+
     def desenhar_tela_funcionarios(self):
         self.limpar_tela()
         ctk.CTkLabel(self.content_area, text="👥 Nossa Equipe Petz", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(pady=20)
@@ -606,7 +808,7 @@ class HubView(ctk.CTkFrame):
             f = ctk.CTkFrame(scroll, fg_color="#F9F9F9", corner_radius=10)
             f.pack(fill="x", pady=5, padx=10)
             ctk.CTkLabel(f, text=f"   {func}", font=("Inter", 14), text_color=COR_INPUT_TEXTO).pack(side="left", pady=15)
-            if self.controller.is_admin:
+            if self.controller.tem_permissao('equipe_editar'):
                 ctk.CTkButton(f, text="Demitir", fg_color=COR_PERIGO, width=80, height=30, command=lambda x=func: self.controller.demitir_funcionario(x)).pack(side="right", padx=10)
         ctk.CTkButton(self.content_area, text="Voltar", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR).pack(pady=20)
 
@@ -765,21 +967,84 @@ class HubView(ctk.CTkFrame):
 
     def desenhar_tela_agenda(self):
         self.limpar_tela()
-        ctk.CTkLabel(self.content_area, text="📅 Agenda Próximos Pets", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(pady=20)
-        scroll = ctk.CTkScrollableFrame(self.content_area, width=850, height=450, fg_color="transparent")
-        scroll.pack()
+        
+        topo_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        topo_frame.pack(fill="x", pady=(10, 20), padx=20)
+        ctk.CTkLabel(topo_frame, text="📅 Agenda de Atendimentos", font=("Inter", 24, "bold"), text_color=COR_NAVBAR).pack(side="left")
+        
+        if self.controller.tem_permissao('agenda_editar'):
+            ctk.CTkButton(topo_frame, text="+ Novo Agendamento", fg_color=COR_SUCESSO, font=("Inter", 14, "bold"), width=200, height=40, corner_radius=10, 
+                          command=lambda: self.abrir_modal_agendamento()).pack(side="right")
+
+        scroll = ctk.CTkScrollableFrame(self.content_area, width=1050, height=480, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20)
+        
         if not self.controller.agendamentos:
-            ctk.CTkLabel(scroll, text="Tudo limpo por aqui!", text_color="gray", font=("Inter", 16)).pack(pady=50)
+            ctk.CTkLabel(scroll, text="Nenhum agendamento encontrado.", text_color="gray", font=("Inter", 16)).pack(pady=50)
+        
+        status_cores = {
+            'agendado': ('#3498db', '🗓️'),
+            'iniciado': ('#f39c12', '▶️'),
+            'concluído': ('#2ecc71', '✅'),
+            'pago': ('#27ae60', '💵'),
+            'cancelado': ('#e74c3c', '❌'),
+        }
+        
         for a in self.controller.agendamentos:
+            # a: (0:id, 1:cliente, 2:pet, 3:servico, 4:funcionario, 5:data, 6:hora, 7:status, 8:cor_tintura, 9:observacoes, 10:valor, 11-14:ids)
+            a_id = a[0]
+            a_cliente = a[1]
+            a_pet = a[2]
+            a_servico = a[3]
+            a_func = a[4]
+            a_data = a[5].strftime("%d/%m/%Y") if hasattr(a[5], 'strftime') else str(a[5])
+            a_hora = str(a[6])
+            if hasattr(a[6], 'total_seconds'):
+                total_s = int(a[6].total_seconds())
+                a_hora = f"{total_s // 3600:02d}:{(total_s % 3600) // 60:02d}"
+            a_status = a[7]
+            a_cor = a[8] or ''
+            a_obs = a[9] or ''
+            a_valor = a[10]
+            
+            cor_status, ico = status_cores.get(a_status, ('#888', '❓'))
+            
             f = ctk.CTkFrame(scroll, fg_color=COR_CARD, corner_radius=15, border_width=1, border_color=COR_BORDA)
-            f.pack(fill="x", pady=8, padx=20)
-            ctk.CTkLabel(f, text="🐕", font=("Inter", 25)).pack(side="left", padx=(20,10), pady=15)
+            f.pack(fill="x", pady=6, padx=5)
+            
+            # Lado esquerdo: info
             info = ctk.CTkFrame(f, fg_color="transparent")
-            info.pack(side="left", fill="y")
-            ctk.CTkLabel(info, text=a['pet'], font=("Inter", 16, "bold"), text_color=COR_NAVBAR).pack(anchor="w", pady=(10,0))
-            ctk.CTkLabel(info, text=f"Dono: {a['humano']}", font=("Inter", 12), text_color="gray").pack(anchor="w")
-            ctk.CTkLabel(f, text=a['servico'], font=("Inter", 12, "bold"), fg_color=COR_BOTAO_ACCENT, text_color="#000", corner_radius=10, width=180, height=35).pack(side="right", padx=30)
-        ctk.CTkButton(self.content_area, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=20)
+            info.pack(side="left", padx=20, pady=12, fill="y")
+            
+            ctk.CTkLabel(info, text=f"🐾 {a_pet}", font=("Inter", 16, "bold"), text_color=COR_NAVBAR).pack(anchor="w")
+            ctk.CTkLabel(info, text=f"Dono: {a_cliente}  |  Serviço: {a_servico}  |  R$ {a_valor:.2f}", font=("Inter", 12), text_color=COR_TEXTO_PADRAO).pack(anchor="w")
+            ctk.CTkLabel(info, text=f"📆 {a_data} às {a_hora}  |  Resp: {a_func}", font=("Inter", 11), text_color="gray").pack(anchor="w")
+            if a_cor:
+                ctk.CTkLabel(info, text=f"🎨 Tintura: {a_cor}", font=("Inter", 11), text_color="#6f42c1").pack(anchor="w")
+            if a_obs:
+                ctk.CTkLabel(info, text=f"📝 {a_obs[:50]}", font=("Inter", 11), text_color="gray").pack(anchor="w")
+            
+            # Lado direito: status + ações
+            right = ctk.CTkFrame(f, fg_color="transparent")
+            right.pack(side="right", padx=15, pady=10)
+            
+            ctk.CTkLabel(right, text=f"{ico} {a_status.upper()}", font=("Inter", 13, "bold"), text_color=cor_status).pack(pady=(0, 5))
+            
+            if self.controller.tem_permissao('agenda_editar') and a_status not in ('pago', 'cancelado'):
+                btn_frame = ctk.CTkFrame(right, fg_color="transparent")
+                btn_frame.pack()
+                
+                proximos = {
+                    'agendado': [('Iniciar', 'iniciado', '#f39c12'), ('Cancelar', 'cancelado', COR_PERIGO)],
+                    'iniciado': [('Concluir', 'concluído', COR_SUCESSO), ('Cancelar', 'cancelado', COR_PERIGO)],
+                    'concluído': [('Marcar Pago', 'pago', '#27ae60')],
+                }
+                
+                for txt, status_novo, cor in proximos.get(a_status, []):
+                    ctk.CTkButton(btn_frame, text=txt, width=80, height=25, fg_color=cor, font=("Inter", 10, "bold"),
+                                  command=lambda aid=a_id, st=status_novo: self.controller.atualizar_status_agendamento(aid, st)).pack(side="left", padx=2)
+
+        ctk.CTkButton(self.content_area, text="Voltar ao Início", command=self.controller.mostrar_controle, fg_color=COR_BOTAO_VOLTAR, height=40, corner_radius=20).pack(pady=15)
 
     # ================= REGISTRO DE VENDA (PDV) =====================
     def desenhar_tela_registro_venda(self):
@@ -918,8 +1183,11 @@ class HubView(ctk.CTkFrame):
         lbl_total = ctk.CTkLabel(right_panel, text="Total: R$ 0.00", font=("Inter", 22, "bold"), text_color=COR_NAVBAR)
         lbl_total.pack(pady=10)
         
-        ctk.CTkButton(right_panel, text="Finalizar Venda", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 16, "bold"), height=50, 
-                      command=self.controller.fechar_venda).pack(fill="x", padx=20, pady=20)
+        if self.controller.tem_permissao('caixa'):
+            ctk.CTkButton(right_panel, text="Finalizar Venda", fg_color=COR_BOTAO_ACCENT, text_color="#000", font=("Inter", 16, "bold"), height=50, 
+                          command=self.controller.fechar_venda).pack(fill="x", padx=20, pady=20)
+        else:
+            ctk.CTkLabel(right_panel, text="⚠️ Somente leitura", text_color="gray", font=("Inter", 12)).pack(pady=20)
 
         def add_item(tipo, nome, preco, id_p=None, ag_id=None, estoque_max=None):
             if not self.controller.carrinho_cliente:

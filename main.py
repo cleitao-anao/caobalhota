@@ -19,15 +19,13 @@ class MainApp(ctk.CTk):
     def show_login(self):
         self.login_page = LoginPage(self, on_login_success=self.show_hub)
 
-    def show_hub(self):
+    def show_hub(self, funcionario_data=None):
         # Destruir a tela de login
         self.login_page.view.place_forget()
         self.login_page.view.destroy()
         
-        # Mudar a cor de fundo caso a pagina de login force alguma, mas ja foi configurada em init
-        
-        # Montar a pagina do hub
-        self.hub_page = HubPage(self)
+        # Montar a pagina do hub com dados do funcionário logado
+        self.hub_page = HubPage(self, funcionario_data=funcionario_data)
         self.hub_page.mount()
 
 def main():

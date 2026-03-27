@@ -27,9 +27,10 @@ class LoginPage:
 
             if funcionario:
                 nome_func = funcionario[1]
+                cargo_func = funcionario[2]
                 messagebox.showinfo("Sucesso", f"Login realizado com sucesso!\nBem-vindo(a), {nome_func}.")
                 if self.on_login_success:
-                    self.on_login_success()
+                    self.on_login_success(funcionario)
             else:
                 messagebox.showerror("Acesso Negado", "E-mail ou senha incorretos.")
 

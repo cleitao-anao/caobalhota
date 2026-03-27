@@ -1,4 +1,4 @@
-from views.hub_view import HubView, SENHA_ADMIN
+from views.hub_view import HubView
 from tkinter import messagebox
 from model.produto import ProdutoModel
 from model.cliente import ClienteModel
@@ -6,23 +6,46 @@ from model.pet import PetModel
 from model.agendamento import AgendamentoModel
 from model.venda import VendaModel
 from model.dashboard import DashboardModel
+from model.servico import ServicoModel
+# Mapa de permissões de AÇÃO por cargo
+# Todos os funcionários podem VER todas as telas
+# Apenas os cargos listados podem ALTERAR/AGIR nas áreas especificadas
+PERMISSAO_POR_CARGO = {
+    'Dono': ['estoque_editar', 'equipe_editar', 'caixa', 'cadastrar', 'clientes_editar', 'agenda_editar', 'servicos_editar'],
+    'Repositor': ['estoque_editar'],
+    'Caixa': ['caixa', 'agenda_editar'],
+    'Atendente': ['cadastrar', 'clientes_editar', 'agenda_editar'],
+    'Veterinário': ['agenda_editar'],
+    'Veterinario': ['agenda_editar'],
+    'Esteticista': ['agenda_editar'],
+}
+
 class HubPage:
-    def __init__(self, master):
+    def __init__(self, master, funcionario_data=None):
         self.master = master
         
-        # State from original Hub
-        self.is_admin = False
+        # Dados do funcionário logado
+        if funcionario_data:
+            self.funcionario_logado = {
+                'id': funcionario_data[0],
+                'nome': funcionario_data[1],
+                'cargo': funcionario_data[2]
+            }
+        else:
+            self.funcionario_logado = {'id': 0, 'nome': 'Usuário', 'cargo': 'Atendente'}
+        
         self.vendas_produtos = {p: 0 for p in ["Ração", "Shampoo", "Coleira", "Petisco", "Brinquedo", "Cama", "Roupas", "Osso", "Caixa", "Escova"]}
         self.vendas_servicos = {s: 0 for s in ["Tosa", "Banho", "Hidratação", "Unhas", "Ouvidos", "Taxi Pet", "Hospedagem", "Adestramento", "Consulta", "Vacina"]}
         # Real product list from DB
         self.produtos = []
-        self.clientes = []  # Array of tuples: (id, nome, cpf, telefone, email, endereco, admin)
+        self.servicos = []
+        self.clientes = []
         self.agendamentos = [] 
         self.funcionarios = ["Carlos  (Dono)", "Ana Costa", "Lucas "]
 
         # PDV Vendas state
         self.carrinho_cliente = None
-        self.carrinho_itens = [] # format: {'tipo': 'produto'|'servico', 'id': int, 'nome': str, 'qtd': int, 'preco': float, 'id_agendamento': int(optional)}
+        self.carrinho_itens = []
 
         self.view = HubView(master, self)
         
@@ -34,31 +57,32 @@ class HubPage:
         self.pack(fill="both", expand=True)
         self.mostrar_controle()
 
-    def solicitar_senha_admin(self):
-        if self.is_admin:
-            self.is_admin = False
-            self.view.set_admin_button_state(False)
-            self.mostrar_controle()
-            return
-        
-        senha = self.view.pedir_senha_admin()
-        try:
-            if senha == SENHA_ADMIN:
-                self.is_admin = True
-                self.view.set_admin_button_state(True)
-                messagebox.showinfo("Sucesso", "Modo Administrador!")
-                self.mostrar_controle()
-            elif senha is not None:
-                messagebox.showerror("Erro", "Incorreta!")
-        except Exception:
-            pass
+    def tem_permissao(self, area):
+        """Verifica se o funcionário logado tem permissão para acessar a área."""
+        cargo = self.funcionario_logado.get('cargo', '')
+        permissoes = PERMISSAO_POR_CARGO.get(cargo, [])
+        return area in permissoes
+
+    def verificar_acesso(self, area, nome_tela="esta tela"):
+        """Verifica acesso e exibe aviso se negado. Retorna True se permitido."""
+        if not self.tem_permissao(area):
+            cargo = self.funcionario_logado.get('cargo', 'Desconhecido')
+            messagebox.showwarning("Acesso Negado", f"O cargo '{cargo}' não tem permissão para acessar {nome_tela}.")
+            return False
+        return True
+
+    def sair_trocar_usuario(self):
+        """Volta para a tela de login."""
+        self.view.pack_forget()
+        self.view.destroy()
+        self.master.show_login()
 
     def mostrar_controle(self):
         self.view.desenhar_controle()
 
     def tela_registros(self):
-        # Update logic to pass current inventory list if necessary
         self.carregar_produtos()
+        self.carregar_servicos()
         self.view.desenhar_tela_registros()
 
     def tela_estoque_visualizacao(self):
@@ -68,8 +92,71 @@ class HubPage:
     def tela_funcionarios(self):
         self.view.desenhar_tela_funcionarios()
 
+    def tela_servicos(self):
+        self.carregar_servicos()
+        self.view.desenhar_tela_servicos()
+
+    def carregar_servicos(self):
+        self.servicos = ServicoModel.listar_todos()
+
+    def tela_agenda(self):
+        self.agendamentos = AgendamentoModel.listar_todos()
+        self.view.desenhar_tela_agenda()
+
+    def criar_agendamento(self, id_cliente, id_pet, id_servico, id_funcionario, data, hora, cor_tintura='', observacoes=''):
+        sucesso = AgendamentoModel.inserir(id_cliente, id_pet, id_servico, id_funcionario, data, hora, cor_tintura, observacoes)
+        if sucesso:
+            messagebox.showinfo("Sucesso", "Agendamento criado com sucesso!")
+            self.tela_agenda()
+            return True
+        else:
+            messagebox.showerror("Erro", "Erro ao criar agendamento.")
+            return False
+
+    def atualizar_status_agendamento(self, id_agendamento, novo_status):
+        sucesso = AgendamentoModel.atualizar_status(id_agendamento, novo_status)
+        if sucesso:
+            messagebox.showinfo("Sucesso", f"Status atualizado para '{novo_status}'!")
+            self.tela_agenda()
+        else:
+            messagebox.showerror("Erro", "Erro ao atualizar status.")
+
+    def salvar_servico(self, id_servico_atual, nome, valor_base, descricao):
+        try:
+            valor_float = float(valor_base.replace(",", "."))
+        except ValueError:
+            messagebox.showwarning("Aviso", "O valor base deve ser numérico.")
+            return False
+
+        if not nome or valor_float < 0:
+            messagebox.showwarning("Aviso", "Nome não pode ser vazio. Valor não pode ser negativo.")
+            return False
+
+        if id_servico_atual is None:
+            sucesso = ServicoModel.inserir(nome, valor_float, descricao)
+            msg = "cadastrado"
+        else:
+            sucesso = ServicoModel.atualizar(id_servico_atual, nome, valor_float, descricao)
+            msg = "atualizado"
+
+        if sucesso:
+            messagebox.showinfo("Sucesso", f"Serviço {msg} com sucesso!")
+            self.tela_servicos()
+            return True
+        else:
+            messagebox.showerror("Erro", "Erro ao salvar serviço no banco de dados.")
+            return False
+
+    def excluir_servico(self, id_servico):
+        if not self.verificar_acesso('servicos_editar', 'gerenciar Serviços'): return
+        if messagebox.askyesno("Confirmar", "Tem certeza que deseja excluir este serviço?"):
+            if ServicoModel.deletar(id_servico):
+                messagebox.showinfo("Sucesso", "Serviço excluído com sucesso.")
+                self.tela_servicos()
+            else:
+                messagebox.showerror("Erro", "Erro ao excluir o serviço.")
+
     def tela_vendas(self):
-        # Redireciona para o novo Dashboard
         self.tela_dashboard()
 
     def tela_dashboard(self):
@@ -85,13 +172,9 @@ class HubPage:
         self.view.desenhar_tela_dashboard(self.dashboard_data)
         
     def tela_registro_venda(self):
-        # The new POS system logic 
         self.carregar_produtos()
         self.carregar_clientes()
         self.view.desenhar_tela_registro_venda()
-
-    def tela_agenda(self):
-        self.view.desenhar_tela_agenda()
 
     def carregar_clientes(self):
         self.clientes = ClienteModel.listar_todos()
@@ -104,6 +187,7 @@ class HubPage:
         self.view.desenhar_tela_pets_cliente(cliente)
 
     def excluir_cliente_logica(self, id_cliente):
+        if not self.verificar_acesso('clientes_editar', 'editar Clientes'): return
         if messagebox.askyesno("Confirmar", "Deseja excluir este cliente e todos os seus pets?"):
             if ClienteModel.deletar(id_cliente):
                 messagebox.showinfo("Sucesso", "Cliente excluído!")
@@ -112,6 +196,7 @@ class HubPage:
                 messagebox.showerror("Erro", "Falha ao excluir cliente.")
 
     def excluir_pet_logica(self, cliente, id_pet):
+        if not self.verificar_acesso('clientes_editar', 'editar Pets'): return
         if messagebox.askyesno("Confirmar", "Deseja excluir este pet?"):
             if PetModel.deletar(id_pet):
                 messagebox.showinfo("Sucesso", "Pet excluído!")
@@ -120,6 +205,7 @@ class HubPage:
                 messagebox.showerror("Erro", "Falha ao excluir pet.")
 
     def abrir_modal_cadastro(self, item_para_venda=None, tipo_venda=None):
+        if not self.verificar_acesso('cadastrar', 'Cadastro de Clientes'): return
         self.view.abrir_modal_cadastro(item_para_venda, tipo_venda)
 
     def salvar_cliente_com_pet(self, dados):
@@ -186,6 +272,7 @@ class HubPage:
     # OUTROS ----------------------------------------------------
 
     def demitir_funcionario(self, func):
+        if not self.verificar_acesso('equipe_editar', 'gerenciar Equipe'): return
         if func in self.funcionarios:
             self.funcionarios.remove(func)
         self.tela_funcionarios()
@@ -208,6 +295,7 @@ class HubPage:
         return AgendamentoModel.listar_concluidos_nao_pagos(id_cliente)
 
     def fechar_venda(self):
+        if not self.verificar_acesso('caixa', 'finalizar Vendas'): return
         if not self.carrinho_cliente:
             messagebox.showwarning("Aviso", "Selecione um cliente para a venda.")
             return
