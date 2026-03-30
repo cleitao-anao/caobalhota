@@ -1,3 +1,10 @@
 .venv/
 __pycache__/
 .vscode/
+.pytest_cache/
+build/
+dist/
+main.spec
+main.exe
+config.ini
+instalador/
